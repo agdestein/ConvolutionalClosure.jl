@@ -1,15 +1,18 @@
 name: CI
+
 on:
   push:
     branches:
       - main
     tags: ['*']
   pull_request:
+
 concurrency:
   # Skip intermediate builds: always.
   # Cancel intermediate builds: only if it is a pull request build.
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
+
 jobs:
   test:
     name: Julia ${{ matrix.version }} - ${{ matrix.os }} - ${{ matrix.arch }} - ${{ github.event_name }}
@@ -18,9 +21,7 @@ jobs:
       fail-fast: false
       matrix:
         version:
-          - '1.0'
-          - '1.8'
-          - 'nightly'
+          - '1'
         os:
           - ubuntu-latest
         arch:
@@ -56,5 +57,10 @@ jobs:
           julia --project=docs -e '
             using Documenter: DocMeta, doctest
             using ConvolutionalClosure
-            DocMeta.setdocmeta!(ConvolutionalClosure, :DocTestSetup, :(using ConvolutionalClosure); recursive=true)
+            DocMeta.setdocmeta!(
+                ConvolutionalClosure,
+                :DocTestSetup,
+                :(using ConvolutionalClosure);
+                recursive = true,
+            )
             doctest(ConvolutionalClosure)'
