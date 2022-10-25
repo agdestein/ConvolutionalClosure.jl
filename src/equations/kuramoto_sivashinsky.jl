@@ -18,7 +18,7 @@ function (kdv::KuramotoSivashinsky{2})(u, p, t)
     u₋₁ = circshift(u, 1)
     u₊₁ = circshift(u, -1)
     u₊₂ = circshift(u, -2)
-    error("Not implemented")
-    du = @. (u₊₂ - 2u₊₁ + 2u₋₁ - u₋₂) / 2Δx^3 - 6 * u * (u₊₁ - u₋₁) / 2Δx
+    du = @. -(u₊₁ - 2u + u₋₁) / Δx^2 - (u₊₂ - 4u₊₁ + 6u - 4u₋₁ + u₋₂) / Δx^4 -
+       ((u₊₁ - u₋₁) / 2Δx)^2 / 2
     du
 end

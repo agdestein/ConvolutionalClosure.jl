@@ -17,16 +17,16 @@ using Zygote
 using ConvolutionalClosure
 
 # Domain length.
-l = 1.0
+l() = 1.0
 
 # Viscosity (if applicable)
-μ = 0.001
+μ() = 0.001
 
 ## Equation
-# equation() = Convection(l)
-# equation() = Burgers(l, μ)
-equation() = KortewegDeVries(l)
-# equation() = KuramotoSivashinsky(l)
+# equation() = Convection(l())
+# equation() = Burgers(l(), μ())
+equation() = KortewegDeVries(l())
+# equation() = KuramotoSivashinsky(l())
 
 """
     solve_equation(u₀, t; kwargs...)
@@ -44,8 +44,8 @@ end
 
 # Spatial discretization
 N = 200
-x = LinRange(0, l, N + 1)[2:end]
-Δx = l / N
+x = LinRange(0, l(), N + 1)[2:end]
+Δx = l() / N
 
 # Discrete filter matrix
 Δ = @. 8Δx * (1 + 1 / 3 * sin(2π * x))
@@ -87,7 +87,7 @@ end
 init_weight = glorot_uniform_T
 init_bias = zeros
 
-# Discrete closure term for filtered KdV equation
+# Discrete closure term for filtered equation
 d₁ = 3
 d₂ = 4
 d₃ = 1
@@ -101,10 +101,10 @@ NN = Chain(
         u,
 
         # Square channel to mimic non-linear term
-        u .* u, 
+        u .* u,
 
         # Filter width channel for non-uniformity (same for each batch)
-        repeat(Δ, 1, 1, size(u, 3)), 
+        repeat(Δ, 1, 1, size(u, 3)),
     ),
 
     # Manual padding to account for periodicity
@@ -230,15 +230,16 @@ iplot = 1:10
 hist_i = Int[]
 hist_train = zeros(0)
 hist_test = zeros(0)
-sol_nomodel_train = solve_equation(ū_train[:, iplot, 1], t_train; reltol = 1e-4, abstol = 1e-6)
-sol_nomodel_test = solve_equation(ū_test[:, iplot, 1], t_test; reltol = 1e-4, abstol = 1e-6)
+sol_nomodel_train =
+    solve_equation(ū_train[:, iplot, 1], t_train; reltol = 1e-4, abstol = 1e-6)
+sol_nomodel_test =
+    solve_equation(ū_test[:, iplot, 1], t_test; reltol = 1e-4, abstol = 1e-6)
 err_nomodel_train = relerr(sol_nomodel_train, ū_train[:, iplot, :], t_train)
 err_nomodel_test = relerr(sol_nomodel_test, ū_test[:, iplot, :], t_test)
 function callback(i, p; i_first = 0)
     sol_train =
         solve_filtered(p, ū_train[:, iplot, 1], t_train; reltol = 1e-4, abstol = 1e-6)
-    sol_test =
-        solve_filtered(p, ū_test[:, iplot, 1], t_test; reltol = 1e-4, abstol = 1e-6)
+    sol_test = solve_filtered(p, ū_test[:, iplot, 1], t_test; reltol = 1e-4, abstol = 1e-6)
     err_train = relerr(sol_train, ū_train[:, iplot, :], t_train)
     err_test = relerr(sol_test, ū_test[:, iplot, :], t_test)
     println("Iteration $i \t train $err_train \t test $err_test")
