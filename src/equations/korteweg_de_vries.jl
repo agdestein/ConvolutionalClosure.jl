@@ -18,7 +18,6 @@ function (kdv::KortewegDeVries{2})(u, p, t)
     u₋₁ = circshift(u, 1)
     u₊₁ = circshift(u, -1)
     u₊₂ = circshift(u, -2)
-    # du = @. (u₊₂ - 2u₊₁ + 2u₋₁ - u₋₂) / 2Δx^3 - 3 * (u₊₁^2 - u₋₁^2) / 2Δx
-    du = @. (u₊₂ - 2u₊₁ + 2u₋₁ - u₋₂) / 2Δx^3 - 6 * u * (u₊₁ - u₋₁) / 2Δx
-    du
+    # @. (u₊₂ - 2u₊₁ + 2u₋₁ - u₋₂) / 2Δx^3 - 3 * (u₊₁^2 - u₋₁^2) / 2Δx
+    @. (u₊₂ - 2u₊₁ + 2u₋₁ - u₋₂) / 2Δx^3 - 6 * u * (u₊₁ - u₋₁) / 2Δx
 end

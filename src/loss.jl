@@ -1,4 +1,6 @@
 """
+    relerr(u, v, t)
+
 Average relative errors.
 """
 function relerr(u, v, t)
@@ -9,7 +11,9 @@ function relerr(u, v, t)
 end
 
 """
-Trajectory-fitting loss function.
+    loss_embedded(s, p, u, t, λ; kwargs...)
+
+Compute trajectory-fitting loss.
 """
 function loss_embedded(s, p, u, t, λ; kwargs...)
     sol = s(p, u[:, :, 1], t; kwargs...)
@@ -19,7 +23,9 @@ function loss_embedded(s, p, u, t, λ; kwargs...)
 end
 
 """
-Derivative-fitting loss function.
+    loss_derivative_fit(f, p, dudt, u, λ)
+
+Compute derivative-fitting loss.
 """
 function loss_derivative_fit(f, p, dudt, u, λ)
     predict = f(u, p, zero(eltype(u)))
