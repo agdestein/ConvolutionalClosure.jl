@@ -54,7 +54,7 @@ x = LinRange(0, l(), M + 1)[2:end]
 Δx = l() / N
 
 # # Filter widths
-# Δ = @. 4Δx * (1 + 1 / 3 * sin(2π * x / l()))
+# Δ = @. 3Δx * (1 + 1 / 3 * sin(2π * x / l()))
 # plot(x, Δ; xlabel = "x", title = "Filter width")
 
 # Filter width
@@ -143,16 +143,20 @@ NN = Chain(
     # Some convolutional layers to mimic local differential operators
     (Conv((2r[i] + 1,), c[i] => c[i+1], a[i]; init_weight) for i ∈ eachindex(r))...,
 
-    # From (nx, nchannel = 1, nbatch) to (nx, nbatch)
+    # From (nx, nchannel = 1, nsample) to (nx, nsample)
     u -> reshape(u, size(u, 1), size(u, 3)),
 )
-NN
 
-# Get parameter structure for NN
+# Initialize NN
 rng = Random.default_rng()
 Random.seed!(rng, 0)
 params, state = Lux.setup(rng, NN)
 p₀, re = Lux.destructure(params)
+
+"""
+Compute closure term for given parameters `p`.
+"""
+closure(u, p, t) = first(Lux.apply(NN, u, re(p), state))
 
 """
 Compute right hand side of closed filtered equation.
@@ -160,8 +164,8 @@ This is modeled as unfiltered RHS + neural closure term.
 """
 function filtered(u, p, t)
     du = equation()(u, nothing, t)
-    closure = first(Lux.apply(NN, u, re(p), state))
-    du + closure
+    c = closure(u, p, t)
+    du + c
 end
 
 """
@@ -173,7 +177,7 @@ function solve_filtered(p, u₀, t; kwargs...)
 end
 
 """
-Closure for creating derivative-fitting loss.
+Creating derivative-fitting loss function.
 Chooses a random subset (`nuse`) of the data samples at each evaluation.
 Note that both `u` and `dudt` are of size `(nx, nsample)`.
 """
@@ -186,7 +190,7 @@ function create_loss_derivative_fit(dudt, u; nuse = size(u, 2), λ = 0)
 end
 
 """
-Closure for creating trajectory-fitting loss.
+Create trajectory-fitting loss function.
 Chooses a random subset of the solutions and time points at each evaluation.
 Note that `u` is of size `(nx, nsample, ntime)`
 """
@@ -272,13 +276,16 @@ plot_loss = let
         ū_test[:, iplot, :],
         t_test,
     )
-    function (i, p, ifirst = 0)
+    function plot_loss(i, p, ifirst = 0)
         sol = solve_filtered(p, ū_test[:, iplot, 1], t_test; reltol = 1e-4, abstol = 1e-6)
         err = relerr(sol, ū_test[:, iplot, :], t_test)
         println("Iteration $i \t average relative error $err")
         push!(hist_i, ifirst + i)
         push!(hist_err, err)
-        pl = plot(; title = "Average relative error", xlabel = "Iterations")
+        pl = plot(;
+            title = "Average relative error",
+            xlabel = "Iterations",
+        )
         hline!(pl, [err_nomodel]; color = 1, linestyle = :dash, label = "No closure")
         plot!(pl, hist_i, hist_err; label = "With closure")
         display(pl)
@@ -292,7 +299,7 @@ plot_loss(0, p)
 
 # Derivative fitting loss
 loss_df = create_loss_derivative_fit(
-    # Merge sample and time dimension, with new size nx × (nsample ntime)
+    # Merge sample and time dimension, with new size `(nx, nsample*ntime)`
     reshape(dūdt_train, M, :),
     reshape(ū_train, M, :);
 
@@ -305,11 +312,12 @@ loss_df = create_loss_derivative_fit(
 
 # Fit predicted time derivatives to reference time derivatives
 i_first = last(plot_loss.hist_i)
-nplot = 50
+nplot = 100
 for i ∈ 1:5000
     grad = first(gradient(loss_df, p))
     opt, p = Optimisers.update(opt, p, grad)
-    i % nplot == 0 ? plot_loss(i, p, i_first) : println("Iteration $i")
+    # i % nplot == 0 ? plot_loss(i, p, i_first) : println("Iteration $i")
+    i % nplot == 0 ? plot_loss(i, p, i_first) : nothing
 end
 
 # Trajectory fitting loss
@@ -334,11 +342,11 @@ loss_emb = create_loss_embedded(
 
 # Fit the predicted trajectories to the reference trajectories
 i_first = last(plot_loss.hist_i)
-n_cb = 1
+nplot = 1
 for i ∈ 1:100
     grad = first(gradient(loss_emb, p))
     opt, p = Optimisers.update(opt, p, grad)
-    i % n_cb == 0 ? plot_loss(i, p, i_first) : println("Iteration $i")
+    i % nplot == 0 ? plot_loss(i, p, i_first) : println("Iteration $i")
 end
 
 ## Plot performance evolution
@@ -360,3 +368,6 @@ for (i, t) ∈ enumerate(t)
     display(pl)
     sleep(0.05)
 end
+
+heatmap(sol[:, 1, :])
+heatmap(sol_NN[:, 1, :])
