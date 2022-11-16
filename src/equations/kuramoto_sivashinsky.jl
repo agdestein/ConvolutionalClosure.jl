@@ -12,8 +12,8 @@ end
 Compute right hand side of Kuramoto-Sivashinsky equation.
 This works for both vector and matrix `u` (one or many solutions).
 """
-function (kdv::KuramotoSivashinsky{2})(u, p, t)
-    Δx = kdv.l / size(u, 1)
+function (e::KuramotoSivashinsky{2})(u, p, t)
+    Δx = e.l / size(u, 1)
     u₋₂ = circshift(u, 2)
     u₋₁ = circshift(u, 1)
     u₊₁ = circshift(u, -1)
@@ -22,3 +22,5 @@ function (kdv::KuramotoSivashinsky{2})(u, p, t)
        (u₊₁^2 - u₋₁^2) / 4Δx
     du
 end
+
+eqname(::KuramotoSivashinsky) = "kuramoto_sivashinsky"

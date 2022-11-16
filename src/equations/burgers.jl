@@ -50,3 +50,5 @@ end
 #     du = @. -((a₊ < 0)u₊^2 + (a₊ > 0)u^2 - (a₋ < 0)u^2 - (a₋ > 0)u₋^2) / Δx + μ * (u₋ - 2u + u₊) / Δx^2
 #     du
 # end
+
+eqname(::Burgers) = "burgers"

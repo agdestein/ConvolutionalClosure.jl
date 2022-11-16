@@ -1,40 +1,40 @@
 """
-    Convection(l, N = 2)
+    Diffusion(l, μ, N = 2)
 
-Convection equation with domain length `l` and order `N`.
+Diffusion equation with domain length `l`, diffusivity `μ`, and order `N`.
 """
-struct Convection{N,T} <: AbstractEquation
+struct Diffusion{N,T} <: AbstractEquation
     l::T
-    Convection(l, N = 2) = new{N,typeof(l)}(l)
+    μ::T
+    Diffusion(l, N = 2) = new{N,typeof(l)}(l, μ)
 end
 
 """
-    (::Convection)(u, p, t)
+    (::Diffusion)(u, p, t)
 
-Compute right hand side of convection equation.
+Compute right hand side of diffusion equation.
 This works for both vector and matrix `u` (one or many solutions).
 """
-function (::Convection) end
+function (::Diffusion) end
 
-function (e::Convection{2})(u, p, t)
+function (e::Diffusion{2})(u, p, t)
     Δx = e.l / size(u, 1)
     u₋₁ = circshift(u, 1)
     u₊₁ = circshift(u, -1)
-    du = @. -(u₊₁ - u₋₁) / 2Δx
-    du
+    @. (u₊₁ - 2u + u₋₁) / Δx^2
 end
 
-function (e::Convection{4})(u, p, t)
+function (e::Diffusion{4})(u, p, t)
     Δx = e.l / size(u, 1)
     u₋₂ = circshift(u, 2)
     u₋₁ = circshift(u, 1)
     u₊₁ = circshift(u, -1)
     u₊₂ = circshift(u, -2)
-    du = @. -(-u₊₂ + 8u₊₁ - 8u₋₁ + u₋₂) / 12Δx
-    du
+    error()
+    @. -(-u₊₂ + 8u₊₁ - 8u₋₁ + u₋₂) / 12Δx
 end
 
-function (e::Convection{6})(u, p, t)
+function (e::Diffusion{6})(u, p, t)
     Δx = e.l / size(u, 1)
     u₋₃ = circshift(u, 3)
     u₋₂ = circshift(u, 2)
@@ -43,11 +43,10 @@ function (e::Convection{6})(u, p, t)
     u₊₂ = circshift(u, -2)
     u₊₃ = circshift(u, -3)
     error()
-    du = @. -(-u₊₂ + 8u₊₁ - 8u₋₁ + u₋₂) / 12Δx
-    du
+    @. -(-u₊₂ + 8u₊₁ - 8u₋₁ + u₋₂) / 12Δx
 end
 
-function (e::Convection{8})(u, p, t)
+function (e::Diffusion{8})(u, p, t)
     Δx = e.l / size(u, 1)
     u₋₄ = circshift(u, 3)
     u₋₃ = circshift(u, 3)
@@ -58,8 +57,7 @@ function (e::Convection{8})(u, p, t)
     u₊₃ = circshift(u, -3)
     u₊₄ = circshift(u, -3)
     error()
-    du = @. -(-u₊₂ + 8u₊₁ - 8u₋₁ + u₋₂) / 12Δx
-    du
+    @. -(-u₊₂ + 8u₊₁ - 8u₋₁ + u₋₂) / 12Δx
 end
 
-eqname(::Convection) = "convection"
+eqname(::Diffusion) = "diffusion"

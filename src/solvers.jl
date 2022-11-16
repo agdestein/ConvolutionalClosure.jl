@@ -1,0 +1,25 @@
+"""
+    rk4(f, p, u₀, t, Δt)
+
+Solve ODE ``du/dt = f(u, p, t)`` with RK4, where ``p`` are parameters.
+"""
+function rk4(f, u₀, p, t, Δt)
+    u = u₀
+    nt = length(t)
+    sol = reshape(u₀, size(u₀)..., 1)
+    for i = 1:nt-1
+        n = round(Int, (t[i+1] - t[i]) / Δt)
+        Δt = (t[i+1] - t[i]) / n
+        tᵢ = t[i]
+        for _ = 1:n
+            k₁ = f(u, p, tᵢ)
+            k₂ = f(u + Δt / 2 * k₁, p, tᵢ + Δt / 2)
+            k₃ = f(u + Δt / 2 * k₂, p, tᵢ + Δt / 2)
+            k₄ = f(u + Δt * k₃, p, t + Δt)
+            u = @. u + Δt * (k₁ / 6 + k₂ / 3 + k₃ / 3 + k₄ / 6)
+            tᵢ = tᵢ + Δt
+        end
+        sol = cat(sol, u; dims = 3)
+    end
+    sol
+end
