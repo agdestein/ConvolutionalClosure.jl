@@ -13,7 +13,7 @@ Plot matrix.
 plotmat(A; kwargs...) = heatmap(
     A;
     # reverse(A; dims = 1);
-    aspect_ratio = :equal,
+    # aspect_ratio = :equal,
     xlims = (1 / 2, size(A, 2) + 1 / 2),
     ylims = (1 / 2, size(A, 1) + 1 / 2),
     yflip = true,
@@ -23,4 +23,4 @@ plotmat(A; kwargs...) = heatmap(
     kwargs...,
 )
 
-plotmat(A::AbstractSparseMatrix) = plotmat(Matrix(A))
+plotmat(A::AbstractSparseMatrix; kwargs...) = plotmat(Matrix(A); kwargs...)

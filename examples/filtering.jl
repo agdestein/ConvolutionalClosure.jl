@@ -13,16 +13,14 @@ using JLD2
 using LaTeXStrings
 using LinearAlgebra
 using Lux
-using Optimisers
 using Plots
 using Printf
-using Random
 using SciMLSensitivity
-using Zygote
+
 
 # Domain length
-l() = 8π
-# l() = 1.0
+# l() = 8π
+l() = 1.0
 
 # Viscosity (if applicable)
 μ() = 0.001
@@ -31,14 +29,14 @@ l() = 8π
 tref() = 0.1
 
 ## Equation
-# equation() = Convection(l())
+equation() = Convection(l())
 # equation() = Diffusion(l(), μ())
 # equation() = Burgers(l(), μ())
-equation() = KortewegDeVries(l())
+# equation() = KortewegDeVries(l())
 # equation() = KuramotoSivashinsky(l())
 
 # Fine discretization
-N = 200
+N = 400
 ξ = LinRange(0, l(), N + 1)[2:end]
 Δξ = l() / N
 
@@ -47,13 +45,13 @@ M = 100
 x = LinRange(0, l(), M + 1)[2:end]
 Δx = l() / M
 
-# # Filter widths
-# ΔΔ(x) = 3Δx * (1 + 1 / 3 * sin(2π * x / l()))
-# Δ = ΔΔ.(x)
-# plot(x, Δ; xlabel = "x", title = "Filter width")
+# Filter widths
+ΔΔ(x) = 3Δx * (1 + 1 / 3 * sin(2π * x / l()))
+Δ = ΔΔ.(x)
+plot(x, Δ; xlabel = "x", title = "Filter width")
 
-# Filter width
-Δ = 3Δx
+# # Filter width
+# Δ = 5Δx
 
 # Discrete filter matrix
 W = sum(gaussian.(Δ, x .- ξ' .- z .* l()) for z ∈ -2:2)
@@ -64,10 +62,11 @@ plotmat(W; title = "Discrete filter")
 u₀ = @. sin(2π * ξ / l()) + sin(2π * 3ξ / l()) + cos(2π * 5ξ / l())
 u₀ = @. sin(2π * ξ / l())
 u₀ = @. exp(-(ξ / l() - 0.5)^2 / 0.005)
+u₀ = @. 1.0 * (abs(ξ / l() - 0.5) ≤ 1 / 6)
 plot(u₀; xlabel = "x")
 
 # Plot example solution
-t = LinRange(0, 50 * tref(), 101)
+t = LinRange(0, 10 * tref(), 101)
 sol = solve_equation(equation(), u₀, nothing, t; reltol = 1e-6, abstol = 1e-8)
 Wsol = W * sol
 for (i, t) ∈ enumerate(t)
@@ -88,114 +87,10 @@ E = [Δξ * u'u / 2 for u ∈ sol.u]
 Ē = [Δx * ū'ū / 2 for ū ∈ eachcol(Wsol)]
 plot(t, [E Ē]; xlabel = "t", title = "Energy", label = ["Unfiltered" "Filtered"])
 
-## Safe (but creates NN with Float32)
-# init_weight = Lux.glorot_uniform
-# init_bias = Lux.zeros32
-
-# This also works for Float64
-init_weight = glorot_uniform_Float64
-init_bias = zeros
-
-# Kernel radii (nlayer)
-r = [3, 4, 1]
-
-# Number of channels (nlayer + 1)
-# First is number of input channels, last must be 1
-c = [2, 4, 3, 1]
-
-# Activation functions (nlayer)
-a = [Lux.relu, Lux.relu, identity]
-
-# Discrete closure term for filtered equation
-NN = Chain(
-    # From (nx, nsample) to (nx, nchannel, nsample)
-    u -> reshape(u, size(u, 1), 1, size(u, 2)),
-
-    # Create input channels
-    u -> hcat(
-        # Vanilla channel
-        u,
-
-        # Square channel to mimic non-linear term
-        u .* u,
-
-        # # Filter width channel for non-uniformity (same for each batch)
-        # repeat(Δ, 1, 1, size(u, 3)),
-    ),
-
-    # Manual padding along spatial dimension to account for periodicity
-    u -> [u[end-sum(r)+1:end, :, :]; u; u[1:sum(r), :, :]],
-
-    # Some convolutional layers to mimic local differential operators
-    (Conv((2r[i] + 1,), c[i] => c[i+1], a[i]; init_weight) for i ∈ eachindex(r))...,
-
-    # From (nx, nchannel = 1, nsample) to (nx, nsample)
-    u -> reshape(u, size(u, 1), size(u, 3)),
-
-    # # Difference for momentum conservation
-    # u -> circshift(u, -1) - circshift(u, 1),
-)
-
-# Initialize NN
-rng = Random.default_rng()
-Random.seed!(rng, 0)
-Lux.setup(rng, NN)
-params, state = Lux.setup(rng, NN)
-p₀, re = Lux.destructure(params)
-
-"""
-Compute closure term for given parameters `p`.
-"""
-closure(u, p, t) = first(Lux.apply(NN, u, re(p), state))
-
-"""
-Compute right hand side of closed filtered equation.
-This is modeled as unfiltered RHS + neural closure term.
-"""
-function filtered(u, p, t)
-    du = equation()(u, nothing, t)
-    c = closure(u, p, t)
-    du + c
-end
-
-"""
-Creating derivative-fitting loss function.
-Chooses a random subset (`nuse`) of the data samples at each evaluation.
-Note that both `u` and `dudt` are of size `(nx, nsample)`.
-"""
-function create_loss_derivative_fit(dudt, u; nuse = size(u, 2), λ = 0)
-    function loss(p)
-        i = Zygote.@ignore sort(shuffle(1:size(u, 2))[1:nuse])
-        loss_derivative_fit(filtered, p, dudt[:, i], u[:, i], λ)
-    end
-    loss
-end
-
-"""
-Create trajectory-fitting loss function.
-Chooses a random subset of the solutions and time points at each evaluation.
-Note that `u` is of size `(nx, nsample, ntime)`
-"""
-function create_loss_trajectory_fit(
-    u,
-    t;
-    nsample = size(u, 2),
-    ntime = length(t),
-    λ = 0,
-    kwargs...,
-)
-    function loss(p)
-        iu = Zygote.@ignore sort(shuffle(1:size(u, 2))[1:nsample])
-        it = Zygote.@ignore sort(shuffle(1:length(t))[1:ntime])
-        loss_embedded(filtered, p, u[:, iu, it], t[it], λ; kwargs...)
-    end
-    loss
-end
-
 """
 Linear-ish frequency decay.
 """
-decay(k) = 1 / (1 + abs(k))
+decay(k) = 1 / (1 + abs(k))^1.2
 
 ## Maximum frequency in initial conditions
 K = N ÷ 2
@@ -252,29 +147,29 @@ for (i, t) ∈ enumerate(t)
 end
 
 # Callback for studying convergence
-plot_loss = let
-    ū, t = ū_valid, t_valid
-    # ū, t = ū_test, t_test
+function create_callback(f, ū, t)
     iplot = 1:10
     hist_i = Int[]
     hist_err = zeros(0)
     err_nomodel = relerr(
-        solve_equation(
-            equation(),
-            ū[:, iplot, 1],
-            nothing,
-            t;
-            reltol = 1e-4,
-            abstol = 1e-6,
+        Array(
+            solve_equation(
+                equation(),
+                ū[:, iplot, 1],
+                nothing,
+                t;
+                reltol = 1e-4,
+                abstol = 1e-6,
+            ),
         ),
         ū[:, iplot, :],
         t,
     )
-    function plot_loss(i, p, ifirst = 0)
-        sol = solve_equation(filtered, ū[:, iplot, 1], p, t; reltol = 1e-4, abstol = 1e-6)
-        err = relerr(sol, ū[:, iplot, :], t)
+    function callback(i, p)
+        sol = solve_equation(f, ū[:, iplot, 1], p, t; reltol = 1e-4, abstol = 1e-6)
+        err = relerr(Array(sol), ū[:, iplot, :], t)
         println("Iteration $i \t average relative error $err")
-        push!(hist_i, ifirst + i)
+        push!(hist_i, i)
         push!(hist_err, err)
         pl = plot(; title = "Average relative error", xlabel = "Iterations")
         hline!(pl, [err_nomodel]; color = 1, linestyle = :dash, label = "No closure")
@@ -283,137 +178,261 @@ plot_loss = let
     end
 end
 
-# Initial parameters
-p = p₀
-opt = Optimisers.setup(Optimisers.ADAM(0.001), p)
-plot_loss(0, p)
+# Simple model
+p₀_simple, simple_closure = convolutional_closure(
+    # Kernel radii (nlayer)
+    [4],
 
-# Derivative fitting loss
-loss_df = create_loss_derivative_fit(
-    # Merge solution and time dimension, with new size `(nx, nsolution*ntime)`
-    reshape(dūdt_train, M, :),
-    reshape(ū_train, M, :);
+    # Number of channels (nlayer + 1)
+    # First is number of input channels, last must be 1
+    [1, 1],
 
-    # Number of random data samples for each loss evaluation (batch size)
-    nuse = 100,
+    # Activation functions (nlayer)
+    [identity],
 
-    # Tikhonov regularization weight
-    λ = 1e-8,
-);
+    # Bias
+    [false],
+)
 
-# Fit predicted time derivatives to reference time derivatives
-i_first = last(plot_loss.hist_i)
-nplot = 100
-for i ∈ 1:5000
-    grad = first(gradient(loss_df, p))
-    opt, p = Optimisers.update(opt, p, grad)
-    # i % nplot == 0 ? plot_loss(i, p, i_first) : println("Iteration $i")
-    i % nplot == 0 && plot_loss(i, p, i_first)
-end
-p_df = p
+# Initialize NN
+p₀, closure = convolutional_closure(
+    # Kernel radii (nlayer)
+    [4, 4, 3],
+
+    # Number of channels (nlayer + 1)
+    # First is number of input channels, last must be 1
+    [2, 4, 3, 1],
+
+    # Activation functions (nlayer)
+    [Lux.relu, Lux.relu, identity],
+
+    # Bias
+    [true, true, true];
+
+    # Input channels
+    channel_augmenter = u -> hcat(
+        # Vanilla channel
+        u,
+
+        # # Square channel to mimic non-linear term
+        # u .* u,
+
+        # Filter width channel for non-uniformity (same for each batch)
+        repeat(Δ, 1, 1, size(u, 3)),
+    ),
+)
+
+"""
+Compute right hand side of closed filtered equation.
+This is modeled as unfiltered RHS + neural closure term.
+"""
+filtered_simple(u, p, t) = equation()(u, nothing, t) + simple_closure(u, p, t)
+filtered(u, p, t) = equation()(u, nothing, t) + closure(u, p, t)
+
+p_simple_df = train(
+    p -> loss_derivative_fit(
+        filtered_simple,
+        p,
+
+        # Merge solution and time dimension, with new size `(nx, nsolution*ntime)`
+        reshape(dūdt_train, M, :),
+        reshape(ū_train, M, :);
+
+        # Number of random data samples for each loss evaluation (batch size)
+        nuse = 100,
+
+        # Tikhonov regularization weight
+        λ = 1e-8,
+    ),
+    p₀_simple,
+    10000;
+    ncallback = 100,
+    callback = create_callback(filtered_simple, ū_valid, t_valid),
+)
+
+p_df = train(
+    p -> loss_derivative_fit(
+        filtered,
+        p,
+
+        # Merge solution and time dimension, with new size `(nx, nsolution*ntime)`
+        reshape(dūdt_train, M, :),
+        reshape(ū_train, M, :);
+
+        # Number of random data samples for each loss evaluation (batch size)
+        nuse = 100,
+
+        # Tikhonov regularization weight
+        λ = 1e-8,
+    ),
+    p₀,
+    3000;
+    ncallback = 100,
+    callback = create_callback(filtered, ū_valid, t_valid),
+)
 
 # filename = "output/$(eqname(equation()))_df.jld2"
 # jldsave(filename; p_df)
 # p_df = load(filename, "p_df")
 
 # Trajectory fitting loss
-loss_emb = create_loss_trajectory_fit(
-    ū_train,
-    t_train;
+loss_emb = let
+    loss(p) = loss_trajectory_fit(
+        filtered,
+        p,
+        ū_train,
+        t_train;
 
-    # Number of random samples per evaluation
-    nsample = 5,
+        # Number of initial conditions per evaluation
+        nsolution = 5,
 
-    # Number of random time instances per evaluation
-    ntime = 20,
+        # Number of random time instances per evaluation
+        ntime = 20,
 
-    # Tikhonov regularization weight
-    λ = 1.0e-8,
+        # Tikhonov regularization weight
+        λ = 1.0e-8,
 
-    # Tolerances
-    reltol = 1e-4,
-    abstol = 1e-6,
+        # Tolerances
+        reltol = 1e-4,
+        abstol = 1e-6,
 
-    ## Sensitivity algorithm for computing gradient
-    # sensealg = BacksolveAdjoint(; autojacvec = ZygoteVJP()),
-    sensealg = InterpolatingAdjoint(; autojacvec = ZygoteVJP()),
-    # sensealg = QuadratureAdjoint(; autojacvec = ZygoteVJP()),
-);
-
-# Fit the predicted trajectories to the reference trajectories
-i_first = last(plot_loss.hist_i)
-nplot = 100
-for i ∈ 1:1000
-    grad = first(gradient(loss_emb, p))
-    opt, p = Optimisers.update(opt, p, grad)
-    # i % nplot == 0 ? plot_loss(i, p, i_first) : println("Iteration $i")
-    i % nplot == 0 && plot_loss(i, p, i_first)
+        ## Sensitivity algorithm for computing gradient
+        # sensealg = BacksolveAdjoint(; autojacvec = ZygoteVJP()),
+        sensealg = InterpolatingAdjoint(; autojacvec = ZygoteVJP()),
+        # sensealg = QuadratureAdjoint(; autojacvec = ZygoteVJP()),
+    )
 end
-p_tf = p
+
+p_tf = train(
+    p -> loss_trajectory_fit(
+        filtered,
+        p,
+        ū_train,
+        t_train;
+
+        # Number of initial conditions per evaluation
+        nsolution = 5,
+
+        # Number of random time instances per evaluation
+        ntime = 20,
+
+        # Tikhonov regularization weight
+        λ = 1.0e-8,
+
+        # Tolerances
+        reltol = 1e-4,
+        abstol = 1e-6,
+
+        ## Sensitivity algorithm for computing gradient
+        # sensealg = BacksolveAdjoint(; autojacvec = ZygoteVJP()),
+        sensealg = InterpolatingAdjoint(; autojacvec = ZygoteVJP()),
+        # sensealg = QuadratureAdjoint(; autojacvec = ZygoteVJP()),
+    ),
+    p₀,
+    100;
+    ncallback = 10,
+    callback = create_callback(filtered, ū_valid, t_valid),
+)
 
 # filename = "output/$(eqname(equation()))_tf.jld2"
 # jldsave(filename; p_tf)
 # p_tf = load(filename, "p_tf")
 
-## Plot performance evolution
-# ū, u, t = ū_train, u_train, t_train
-# ū, u, t = ū_valid, u_valid, t_valid
-ū, u, t = ū_test, u_test, t_test
-isample = 2:2
+# Plot performance evolution
+isample = 2
+# ū, u, t = ū_train[:, isample, :], u_train[:, isample, :]:, isample, :, t_train
+# ū, u, t = ū_valid[:, isample, :], u_valid[:, isample, :]:, isample, :, t_valid
+ū, u, t = ū_test[:, isample, :], u_test[:, isample, :], t_test
 sol_nomodel =
-    solve_equation(equation(), ū[:, isample, 1], nothing, t; reltol = 1e-4, abstol = 1e-6)
-sol_df = solve_equation(filtered, ū[:, isample, 1], p_df, t; reltol = 1e-4, abstol = 1e-6)
-sol_tf = solve_equation(filtered, ū[:, isample, 1], p_tf, t; reltol = 1e-4, abstol = 1e-6)
+    solve_equation(equation(), ū[:, 1], nothing, t; reltol = 1e-4, abstol = 1e-6)
+sol_simple_df = solve_equation(filtered_simple, ū[:, 1], p_simple_df, t; reltol = 1e-4, abstol = 1e-6)
+sol_df = solve_equation(filtered, ū[:, 1], p_df, t; reltol = 1e-4, abstol = 1e-6)
+# sol_tf = solve_equation(filtered, ū[:, 1], p_tf, t; reltol = 1e-4, abstol = 1e-6)
 for (i, t) ∈ enumerate(t)
     pl = plot(;
         xlabel = "x",
         title = @sprintf("Solutions, t = %.3f", t),
-        ylims = extrema(u[:, isample, :]),
+        ylims = extrema(u),
     )
 
-    # plot!(pl, ξ, u[:, isample, i]; linestyle = :dash, label = "Unfiltered")
-    plot!(pl, x, ū[:, isample, i]; label = "Filtered exact")
+    # plot!(pl, ξ, u[:, i]; linestyle = :dash, label = "Unfiltered")
+    plot!(pl, x, ū[:, i]; label = "Filtered exact")
     plot!(pl, x, sol_nomodel[i]; label = "No closure")
     # plot!(pl, x, sol_NN[i]; label = "Neural closure")
+    plot!(pl, x, sol_simple_df[i]; label = "Derivative fit (simple)")
     plot!(pl, x, sol_df[i]; label = "Derivative fit")
-    plot!(pl, x, sol_tf[i]; label = "Trajectory fit")
+    # plot!(pl, x, sol_tf[i]; label = "Trajectory fit")
 
     display(pl)
     sleep(0.05)
 end
 
 # Momentum
-m_exact = [Δx * sum(v) for v ∈ eachcol(ū[:, isample[1], :])]
+m_exact = [Δx * sum(v) for v ∈ eachcol(ū)]
 m_nomodel = [Δx * sum(v) for v ∈ sol_nomodel.u]
+m_simple_df = [Δx * sum(v) for v ∈ sol_simple_df.u]
 m_df = [Δx * sum(v) for v ∈ sol_df.u]
-m_tf = [Δx * sum(v) for v ∈ sol_tf.u]
+# m_tf = [Δx * sum(v) for v ∈ sol_tf.u]
 pl = plot(; xlabel = "t", title = "Filtered Momentum")
 plot!(t, m_exact; label = "Exact")
 plot!(t, m_nomodel; label = "No closure")
+plot!(t, m_simple_df; label = "Derivative fit (simple)")
 plot!(t, m_df; label = "Derivative fit")
 # plot!(t, m_tf; label = "Trajectory fit")
 pl
 
 # Energy
-E_exact = [Δx * v'v / 2 for v ∈ eachcol(ū[:, isample[1], :])]
-E_nomodel = [Δx * v'v / 2 for v ∈ eachcol(sol_nomodel[:, 1, :])]
-E_df = [Δx * v'v / 2 for v ∈ eachcol(sol_df[:, 1, :])]
-E_tf = [Δx * v'v / 2 for v ∈ eachcol(sol_tf[:, 1, :])]
+E_exact = [Δx * v'v / 2 for v ∈ eachcol(ū)]
+E_nomodel = [Δx * v'v / 2 for v ∈ sol_nomodel.u]
+E_simple_df = [Δx * v'v / 2 for v ∈ sol_simple_df.u]
+E_df = [Δx * v'v / 2 for v ∈ sol_df.u]
+# E_tf = [Δx * v'v / 2 for v ∈ sol_tf.u]
 pl = plot(; xlabel = "t", title = "Filtered Energy")
 plot!(t, E_exact; label = "Exact")
 plot!(t, E_nomodel; label = "No closure")
+plot!(t, E_simple_df; label = "Derivative fit (simple)")
 plot!(t, E_df; label = "Derivative fit")
-plot!(t, E_tf; label = "Trajectory fit")
+# plot!(t, E_tf; label = "Trajectory fit")
 pl
 
-plotsol(x, t, ū[:, isample[1], :])
-plotsol(x, t, sol_df[:, 1, :])
-plotsol(x, t, sol_tf[:, 1, :])
-plotsol(x, t, sol_nomodel[:, 1, :])
-plotsol(x, t, (sol_nomodel[:, 1, :] - ū[:, isample[1], :]) ./ norm(ū[:, isample[1], :]))
-plotsol(x, t, (sol_df[:, 1, :] - ū[:, isample[1], :]) ./ norm(ū[:, isample[1], :]))
-plotsol(x, t, (sol_tf[:, 1, :] - ū[:, isample[1], :]) ./ norm(ū[:, isample[1], :]))
+plotsol(ξ, t, u)
+plotsol(x, t, ū)
+plotsol(x, t, sol_df)
+# plotsol(x, t, sol_tf[:, 1, :])
+plotsol(x, t, sol_nomodel)
+plotsol(x, t, (sol_nomodel - ū) ./ norm(ū))
+plotsol(x, t, (sol_df - ū) ./ norm(ū))
+# plotsol(x, t, (sol_tf - ū[:, isample, :]) ./ norm(ū[:, isample, :]))
 
-relerr(sol_nomodel, ū[:, isample, :], t)
-relerr(sol_df, ū[:, isample, :], t)
-relerr(sol_tf, ū[:, isample, :], t)
+relerr(Array(sol_nomodel), ū, t)
+relerr(Array(sol_simple_df), ū, t)
+relerr(Array(sol_df), ū, t)
+# relerr(Array(sol_tf), ū, t)
+
+
+## Example solution
+u₀ = @. sin(2π * ξ / l()) + sin(2π * 3ξ / l()) + cos(2π * 5ξ / l())
+u₀ = @. sin(2π * ξ / l())
+u₀ = @. exp(-(ξ / l() - 0.5)^2 / 0.005)
+u₀ = @. 1.0 * (abs(ξ / l() - 0.5) ≤ 1 / 6)
+plot(u₀; xlabel = "x")
+
+# Plot example solution
+t = LinRange(0, 10 * tref(), 101)
+u = solve_equation(equation(), u₀, nothing, t; reltol = 1e-6, abstol = 1e-8)
+ū = W * u
+sol_nomodel = solve_equation(equation(), ū[:, 1], nothing, t; reltol = 1e-4, abstol = 1e-6)
+sol_simple_df = solve_equation(filtered_simple, ū[:, 1], p_simple_df, t; reltol = 1e-4, abstol = 1e-6)
+sol_df = solve_equation(filtered, ū[:, 1], p_df, t; reltol = 1e-4, abstol = 1e-6)
+# sol_tf = solve_equation(filtered, ū[:, 1], p_tf, t; reltol = 1e-4, abstol = 1e-6)
+for (i, t) ∈ enumerate(t)
+    pl = plot(; xlabel = "x", title = @sprintf("t = %.2f", t), ylims = extrema(ū[:, :]))
+    # plot!(pl, ξ, u[i]; label = "Unfiltered")
+    # plot!(pl, x, ū[:, i]; label = "Exact")
+    # plot!(pl, x, sol_nomodel[:, i]; label = "No model")
+    plot!(pl, x, sol_simple_df[:, i]; label = "Derivative fit (simple)")
+    plot!(pl, x, sol_df[:, i]; label = "Derivative fit")
+    # plot!(pl, x, sol_tf[:, i]; label = "Trajectory fit")
+    display(pl)
+    sleep(0.05) # Time for plot pane to update
+end

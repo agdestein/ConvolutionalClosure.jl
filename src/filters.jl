@@ -16,9 +16,9 @@ gaussian(Δ, x) = √(6 / π) / Δ * exp(-6x^2 / Δ^2)
 Apply filter to a collection of solutions.
 """
 function apply_filter(W, u)
-    ū = zeros(eltype(u), size(W, 1), size(u, 2), size(u, 3))
-    for i ∈ 1:size(u, 3)
-        @views mul!(ū[:, :, i], W, u[:, :, i])
-    end
-    ū
+    u = Array(u)
+    s = size(u)
+    u = reshape(u, s[1], :)
+    y = W * u
+    reshape(y, size(y, 1), s[2:end]...)
 end
