@@ -16,7 +16,7 @@ Compute trajectory-fitting loss.
 Chooses a random subset of the solutions and time points at each evaluation.
 Note that `u` is of size `(nx, nsample, ntime)`
 """
-function create_loss_trajectory_fit(
+function trajectory_loss(
     f,
     p,
     u,
@@ -42,7 +42,7 @@ Compute derivative-fitting loss.
 Chooses a random subset (`nuse`) of the data samples at each evaluation.
 Note that both `u` and `dudt` are of size `(nx, nsample)`.
 """
-function loss_derivative_fit(f, p, dudt, u; nuse = size(u, 2), λ = 0)
+function derivative_loss(f, p, dudt, u; nuse = size(u, 2), λ = 0)
     i = Zygote.@ignore sort(shuffle(1:size(u, 2))[1:nuse])
     dudt = dudt[:, i]
     u = u[:, i]

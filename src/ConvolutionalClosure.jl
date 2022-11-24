@@ -12,7 +12,7 @@ using Zygote
 export top_hat, gaussian, apply_filter
 export Convection, Diffusion, Burgers, KortewegDeVries, KuramotoSivashinsky, eqname
 export rk4
-export relerr, loss_trajectory_fit, loss_derivative_fit
+export relerr, trajectory_loss, derivative_loss
 export plotsol, plotmat
 export create_pod
 export create_data

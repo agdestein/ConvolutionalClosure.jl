@@ -17,7 +17,6 @@ using Plots
 using Printf
 using SciMLSensitivity
 
-
 # Domain length
 # l() = 8π
 l() = 1.0
@@ -230,7 +229,7 @@ filtered_simple(u, p, t) = equation()(u, nothing, t) + simple_closure(u, p, t)
 filtered(u, p, t) = equation()(u, nothing, t) + closure(u, p, t)
 
 p_simple_df = train(
-    p -> loss_derivative_fit(
+    p -> derivative_loss(
         filtered_simple,
         p,
 
@@ -251,7 +250,7 @@ p_simple_df = train(
 )
 
 p_df = train(
-    p -> loss_derivative_fit(
+    p -> derivative_loss(
         filtered,
         p,
 
@@ -277,7 +276,7 @@ p_df = train(
 
 # Trajectory fitting loss
 loss_emb = let
-    loss(p) = loss_trajectory_fit(
+    loss(p) = trajectory_loss(
         filtered,
         p,
         ū_train,
@@ -304,7 +303,7 @@ loss_emb = let
 end
 
 p_tf = train(
-    p -> loss_trajectory_fit(
+    p -> trajectory_loss(
         filtered,
         p,
         ū_train,
