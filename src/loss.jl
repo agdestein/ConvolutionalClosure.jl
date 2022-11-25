@@ -1,9 +1,9 @@
 """
-    relerr(u, v, t)
+    relerr(u, v)
 
-Average relative errors.
+Average relative errors along first dimension.
 """
-function relerr(u, v, t)
+function relerr(u, v)
     n = size(u, 1)
     u = reshape(u, n, :)
     v = reshape(v, n, :)
@@ -14,19 +14,19 @@ end
 """
 Compute trajectory-fitting loss.
 Chooses a random subset of the solutions and time points at each evaluation.
-Note that `u` is of size `(nx, nsample, ntime)`
+Note that `u` is of size `(nx, nsolution, ntime)`
 """
 function trajectory_loss(
     f,
     p,
     u,
     t;
-    nsample = size(u, 2),
+    nsolution = size(u, 2),
     ntime = length(t),
     λ = 0,
     kwargs...,
 )
-    iu = Zygote.@ignore sort(shuffle(1:size(u, 2))[1:nsample])
+    iu = Zygote.@ignore sort(shuffle(1:size(u, 2))[1:nsolution])
     it = Zygote.@ignore sort(shuffle(1:length(t))[1:ntime])
     u = u[:, iu, it]
     t = t[it]
