@@ -18,8 +18,9 @@ export create_pod
 export create_data
 export solve_equation
 export glorot_uniform_Float64
-export convolutional_closure
+export convolutional_closure, convolutional_matrix_closure
 export train
+export circulant, interpolation_matrix
 
 include("filters.jl")
 include("equations/equations.jl")
@@ -32,5 +33,6 @@ include("solve_equation.jl")
 include("init.jl")
 include("closure_models.jl")
 include("train.jl")
+include("utils.jl")
 
 end

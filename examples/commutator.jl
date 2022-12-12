@@ -8,26 +8,23 @@ using LinearAlgebra
 using SparseArrays
 using Plots
 
-"""
-    circulant(n, inds, stencil)
+l() = 1.0
 
-Create circulant `SparseMatrixCSC`.
-"""
-circulant(n, inds, stencil) = spdiagm(
-    (i => fill(s, n - abs(i)) for (i, s) ∈ zip(inds, stencil))...,
-    (i - sign(i) * n => fill(s, abs(i)) for (i, s) ∈ zip(inds, stencil))...,
-)
+N = 90
+M = 30
+loc = "output/N$(N)_M$(M)/"
+mkpath(loc)
 
-N = 30
-M = 10
+ξ = LinRange(0, l(), N + 1)[2:end]
+x = LinRange(0, l(), M + 1)[2:end]
 
 DN = circulant(N, [-1, 1], [-N / 2, N / 2])
 DM = circulant(M, [-1, 1], [-M / 2, M / 2])
 plotmat(DN; title = "DN")
 plotmat(DM; title = "DM")
 
-s = [1, 4, 1] / 6
-# s = [1, 1, 1] / 3
+# s = [1, 4, 1] / 6
+s = [1, 1, 1] / 3
 W = circulant(N, -1:1, s)
 W = W[2:3:end, :]
 plotmat(W; title = "W")
@@ -37,6 +34,12 @@ plotmat(DM * W; title = "DM W")
 
 C = W * DN - DM * W
 plotmat(C; title = "C")
+
+P = interpolation_matrix(l(), x, ξ)
+plotmat(P)
+
+plotmat(W * DN * P)
+plotmat(DM)
 
 pl = plot()
 bar!((W * DN)[6, :]; label = "W D")
@@ -53,6 +56,7 @@ plotmat(A * 2 * N / M)
 plotmat(DM)
 plotmat(W * W')
 
+sum(P; dims = 2)
 sum(W * DN; dims = 2)
 sum(W * DN; dims = 2)
 sum(DM * W; dims = 2)
@@ -67,3 +71,13 @@ plot(
     plotmat(C; title = "C");
     size = (1200, 600),
 )
+savefig(loc * "mat.png")
+
+##
+K = N ÷ 2
+u = create_data(ξ, K, 1; decay = k -> 1 / (1 + abs(k))^1.2)
+pl = plot()
+plot!(ξ, u; label = "u")
+plot!(ξ, P * W * u; label = "Pū")
+scatter!(x, W * u; label = "ū")
+pl

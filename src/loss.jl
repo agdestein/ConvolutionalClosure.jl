@@ -43,9 +43,11 @@ Chooses a random subset (`nuse`) of the data samples at each evaluation.
 Note that both `u` and `dudt` are of size `(nx, nsample)`.
 """
 function derivative_loss(f, p, dudt, u; nuse = size(u, 2), λ = 0)
-    i = Zygote.@ignore sort(shuffle(1:size(u, 2))[1:nuse])
-    dudt = dudt[:, i]
-    u = u[:, i]
+    nsample = size(u)[end]
+    d = ndims(u)
+    i = Zygote.@ignore sort(shuffle(1:nsample)[1:nuse])
+    dudt = selectdim(dudt, d, i)
+    u = selectdim(u, d, i)
     predict = f(u, p, zero(eltype(u)))
     # data = sum(abs2, predict - dudt) / length(u)
     data = sum(abs2, predict - dudt) / sum(abs2, dudt)
