@@ -47,6 +47,8 @@ Linear-ish frequency decay.
 """
 decay(k) = 1 / (1 + abs(k))^1.2
 
+plot(0:K, decay; yscale = :log10, xlabel = "k")
+
 # Maximum frequency in initial conditions
 K = N ÷ 2
 # K = 30
@@ -69,6 +71,11 @@ t_train_pod = LinRange(0, 10 * tref(), 60)
 t_train = LinRange(0, tref(), 41)
 t_valid = LinRange(0, 2 * tref(), 26)
 t_test = LinRange(0, 10 * tref(), 61)
+
+t_train
+
+tref()
+10 * tref()
 
 # FOM solutions
 u_train_pod = solve_equation(equation(), u₀_train_pod, nothing, t_train_pod; reltol = 1e-4, abstol = 1e-6)
@@ -130,8 +137,9 @@ plot(t, [E_fom E_rom]; xlabel = "t", title = "Energy", label = ["FOM" "ROM"])
 init_weight = glorot_uniform_Float64
 init_bias = zeros
 
-# Layer sizes (nlayer)
+## Layer sizes (nlayer)
 r = [2M, M, M, M]
+# r = [M, M, M, M]
 
 # Activation functions (nlayer)
 a = [Lux.relu, Lux.relu, identity]
@@ -181,7 +189,7 @@ Note that both `u` and `dudt` are of size `(nx, nsample)`.
 function create_loss_derivative_fit(dvdt, v; nuse = size(v, 2), λ = 0)
     function loss(p)
         i = Zygote.@ignore sort(shuffle(1:size(v, 2))[1:nuse])
-        loss_derivative_fit(rom_closed, p, dvdt[:, i], v[:, i], λ)
+        derivative_loss(rom_closed, p, dvdt[:, i], v[:, i], λ)
     end
     loss
 end

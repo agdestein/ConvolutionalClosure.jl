@@ -19,6 +19,7 @@ using SciMLSensitivity
 
 # Domain length
 # l() = 8π
+# l() = 2π
 l() = 1.0
 
 # Viscosity (if applicable)
@@ -28,11 +29,12 @@ l() = 1.0
 tref() = 0.1
 
 ## Equation
-equation() = Convection(l())
+# equation() = Convection(l())
 # equation() = Diffusion(l(), μ())
-# equation() = Burgers(l(), μ())
+equation() = Burgers(l(), μ())
 # equation() = KortewegDeVries(l())
 # equation() = KuramotoSivashinsky(l())
+# equation() = Schrodinger()
 
 # Fine discretization
 N = 400
@@ -44,13 +46,13 @@ M = 100
 x = LinRange(0, l(), M + 1)[2:end]
 Δx = l() / M
 
-# Filter widths
-ΔΔ(x) = 3Δx * (1 + 1 / 3 * sin(2π * x / l()))
-Δ = ΔΔ.(x)
-plot(x, Δ; xlabel = "x", title = "Filter width")
+# # Filter widths
+# ΔΔ(x) = 3Δx * (1 + 1 / 3 * sin(2π * x / l()))
+# Δ = ΔΔ.(x)
+# plot(x, Δ; xlabel = "x", title = "Filter width")
 
-# # Filter width
-# Δ = 5Δx
+# Filter width
+Δ = 5Δx
 
 # Discrete filter matrix
 W = sum(gaussian.(Δ, x .- ξ' .- z .* l()) for z ∈ -2:2)
@@ -58,20 +60,23 @@ W = W ./ sum(W; dims = 2)
 plotmat(W; title = "Discrete filter")
 
 ## Example solution
+u₀ = @. 1 + 0 * ξ
 u₀ = @. sin(2π * ξ / l()) + sin(2π * 3ξ / l()) + cos(2π * 5ξ / l())
 u₀ = @. sin(2π * ξ / l())
 u₀ = @. exp(-(ξ / l() - 0.5)^2 / 0.005)
 u₀ = @. 1.0 * (abs(ξ / l() - 0.5) ≤ 1 / 6)
 plot(u₀; xlabel = "x")
 
+u₀ = complex(u₀)
+
 # Plot example solution
 t = LinRange(0, 10 * tref(), 101)
 sol = solve_equation(equation(), u₀, nothing, t; reltol = 1e-6, abstol = 1e-8)
 Wsol = W * sol
 for (i, t) ∈ enumerate(t)
-    pl = plot(; xlabel = "x", title = @sprintf("t = %.2f", t), ylims = extrema(sol[:, :]))
-    plot!(pl, ξ, sol[i]; label = "Unfiltered")
-    plot!(pl, x, Wsol[:, i]; label = "Filtered")
+    pl = plot(; xlabel = "x", title = @sprintf("t = %.2f", t), ylims = extrema(real.(sol[:, :])))
+    plot!(pl, ξ, real.(sol[i]); label = "Unfiltered")
+    plot!(pl, x, real.(Wsol[:, i]); label = "Filtered")
     display(pl)
     sleep(0.05) # Time for plot pane to update
 end
@@ -212,11 +217,11 @@ p₀, closure = convolutional_closure(
         # Vanilla channel
         u,
 
-        # # Square channel to mimic non-linear term
-        # u .* u,
+        # Square channel to mimic non-linear term
+        u .* u,
 
-        # Filter width channel for non-uniformity (same for each batch)
-        repeat(Δ, 1, 1, size(u, 3)),
+        # # Filter width channel for non-uniformity (same for each batch)
+        # repeat(Δ, 1, 1, size(u, 3)),
     ),
 )
 
@@ -373,8 +378,10 @@ plot!(t, E_df; label = "Derivative fit")
 # plot!(t, E_tf; label = "Trajectory fit")
 pl
 
-plotsol(ξ, t, u)
-plotsol(x, t, ū)
+plotsol(ξ, t, u[:, 1, :]; title = "u")
+savefig(loc * "burgers_u.png")
+plotsol(x, t, ū[:, 1, :], title = "Wu")
+savefig(loc * "burgers_Wu.png")
 plotsol(x, t, sol_df)
 # plotsol(x, t, sol_tf[:, 1, :])
 plotsol(x, t, sol_nomodel)
@@ -410,14 +417,16 @@ error_total_energy(a, b) = [
     i ∈ 1:size(a, 3)
 ]
 
-err(a, b) = error_momentum(a, b)
-err(a, b) = error_total_momentum(a, b)
-err(a, b) = error_energy(a, b)
-err(a, b) = error_total_energy(a, b)
+errerr(a, b) = error_momentum(a, b)
+errerr(a, b) = error_total_momentum(a, b)
+errerr(a, b) = error_energy(a, b)
+errerr(a, b) = error_total_energy(a, b)
 
-pl = plot(; xlabel = "t", title = "Relative error", legend = :topleft)
-plot!(t, err(v_nomodel, ū); label = "No model")
-plot!(t, err(v_simple_df, ū); label = "Uniform closure")
-plot!(t, err(v_df, ū); label = "Non-uniform closure")
+pl = plot(; xlabel = "t", title = "Relative error", legend = :topright)
+plot!(t, errerr(v_nomodel, ū); label = "No model")
+plot!(t, errerr(v_simple_df, ū); label = "Linear closure")
+plot!(t, errerr(v_df, ū); label = "CNN closure")
 # plot!(t, err(v_tf, ū); label = "Trajectory fit") pl
 pl
+
+savefig(loc * "burgers_relative_errors.pdf")

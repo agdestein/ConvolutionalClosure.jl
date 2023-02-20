@@ -10,7 +10,7 @@ using SparseArrays
 using Zygote
 
 export top_hat, gaussian, apply_filter
-export Convection, Diffusion, Burgers, KortewegDeVries, KuramotoSivashinsky, eqname
+export Convection, Diffusion, Burgers, KortewegDeVries, KuramotoSivashinsky, Schrodinger, eqname
 export rk4
 export relerr, trajectory_loss, derivative_loss
 export plotsol, plotmat
@@ -20,7 +20,8 @@ export solve_equation
 export glorot_uniform_Float64
 export convolutional_closure, convolutional_matrix_closure
 export train
-export circulant, interpolation_matrix
+export circulant, constant_interpolator, linear_interpolator
+export extend1D, extend2D
 
 include("filters.jl")
 include("equations/equations.jl")

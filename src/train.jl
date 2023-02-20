@@ -1,4 +1,11 @@
-function train(loss, p₀, niter; opt = Optimisers.ADAM(0.001), callback = (i, p) -> println("Iteration $i"), ncallback = 1)
+function train(
+    loss,
+    p₀,
+    niter;
+    opt = Optimisers.ADAM(0.001),
+    callback = (i, p) -> println("Iteration $i"),
+    ncallback = 1,
+)
     p = p₀
     opt = Optimisers.setup(opt, p)
     callback(0, p)

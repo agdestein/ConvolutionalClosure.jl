@@ -5,11 +5,11 @@ end
 
 using ConvolutionalClosure
 using Expokit
-# using Integrals
 using LinearAlgebra
 using Lux
 using OrdinaryDiffEq
 using Plots
+using SciMLSensitivity
 using SparseArrays
 
 apply_mat(u, p, t) = p * u
@@ -31,16 +31,17 @@ x = LinRange(0, l(), M + 1)[2:end]
 
 FN = circulant(N, [-1, 1], [-N / 2, N / 2])
 FM = circulant(M, [-1, 1], [-M / 2, M / 2])
-plotmat(FN; title = "DN")
-plotmat(FM; title = "DM")
+plotmat(FN; title = "FN")
+plotmat(FM; title = "FM")
 
-# Filter widths
-ΔΔ(x) = (1 + 1 / 3 * sin(2π * x / l())) * 3 * l() / M
-Δ = ΔΔ.(x)
-plot(x, Δ; xlabel = "x", title = "Filter width")
+# # Filter widths
+# # ΔΔ(x) = (1 + 1 / 2 * sin(2π * x / l())) * 3 * l() / M
+# ΔΔ(x) = (1 + 1 / 3 * sin(2π * x / l())) * 3 * l() / M
+# Δ = ΔΔ.(x)
+# plot(x, Δ; xlabel = "x", title = "Filter width")
 
-# # Filter width
-# Δ = 4 * l() / M
+# Filter width
+Δ = 4 * l() / M
 
 # Discrete filter matrix
 W = sum(gaussian.(Δ, x .- ξ' .- z .* l()) for z ∈ -2:2)
@@ -52,32 +53,38 @@ dropzeros!(W)
 plotmat(W; title = "Discrete filter")
 plotmat(W .!= 0; title = "Discrete filter (sparsity)")
 
-# Interpolant
-P = interpolation_matrix(l(), x, ξ)
-plotmat(P)
+# # Piece-wise constant interpolant
+# R = constant_interpolator(l(), x, ξ)
+# plotmat(R)
 
-# Full reconstructor
-P = Matrix(W'W + 1e-4 * I) \ Matrix(W')
-P = Matrix(W') / Matrix(W * W' + 1e-4 * I)
-plotmat(P)
-plotmat(P * W)
-plotmat(W * P)
+# Linear interpolant
+R = linear_interpolator(l(), x, ξ)
+plotmat(R)
+
+# # Full reconstructor
+# R = Matrix(W') / Matrix(W * W' + 1e-4 * I)
+
+plotmat(R)
+plotmat(R * W)
+plotmat(W * R)
 
 # Mori-Zwanzig matrices
-A = W * FN * P
+A = W * FN * R
 B = W * FN
-C = (I - P * W) * FN * P
-D = (I - P * W) * FN
+C = (I - R * W) * FN * R
+D = (I - R * W) * FN
 
 plotmat(A)
 plotmat(B)
 plotmat(C)
 plotmat(D)
 
-plotmat(P * W)
+plotmat(R * W)
+Matrix(R * W)
 
-savefig(loc * "PW.png")
+Matrix(R'R)
 
+savefig(loc * "RW.png")
 
 """
 Linear-ish frequency decay.
@@ -86,37 +93,82 @@ decay(k) = 1 / (1 + abs(k))^1.2
 
 # Initial conditions
 u₀ = create_data(ξ, N ÷ 2, 1; decay)[:]
-for i = 1:5
-    u₀ = P * W * u₀
-end
+# for i = 1:5
+#     u₀ = R * W * u₀
+# end
 
-pl = plot(; xlabel = "x", title = "Initial conditions")
-plot!(ξ, u₀; label = "Unfiltered")
-plot!(x, W * u₀; label = "Filtered")
+pl = plot(; xlabel = "x", title = "Example signal")
+plot!(ξ, u₀; label = "u")
+# scatter!(x, W * u₀; label = "Filtered")
+plot!(ξ, R * W * u₀; label = "R W u")
+plot!(ξ, (I - R * W) * u₀; label = "u'")
 pl
 
-savefig(loc * "initial_conditions.png")
+savefig(loc * "example_signal.pdf")
 
 # Evaluation time
-t = LinRange(0, 1.0, 501)
+t = LinRange(0, 0.5, 501)
 
 # Unfiltered solution
 u = solve_matrix(FN, u₀, t; reltol = 1e-8, abstol = 1e-10)
 
 # Filtered solution
 ū = W * u
-e = (I - P * W) * u
 
-plot(x, ū[:, 1]; label = "ū")
-plot!(ξ, e[:, 1]; label = "u'")
+# Unresolved solution
+e = (I - R * W) * u
 
 # Filtered time derivatives
 dūdt = W * FN * u
+
+# Kinetic energy
+E(u) = 1 / 2 * l() / length(u) * u'u
+pl = plot(; xlabel = "t", title = "Kinetic energy")
+plot!(t, map(E, eachcol(u)); label = "E(u)")
+plot!(t, map(E, eachcol(R * ū)); label = "E(ū)")
+plot!(t, E.(eachcol(R * ū)) + E.(eachcol(e)); label = "E(ū) + E(u')")
+ylims!((0, ylims()[2]))
+pl
+
+savefig(loc * "kinetic_energy.pdf")
 
 # Individual terms in dūdt
 markov = A * ū
 noise = mapreduce(t -> B * expmv(t, D, e[:, 1]), hcat, t)
 memory = dūdt - markov - noise
+
+kernel = [norm(B * expmv(t[end] - t[i], D, C * W * u[i])) for i = 1:length(u)]
+
+plot(t, kernel; xlabel = "s", title = "Memory kernel", legend = false)
+savefig(loc * "kernel.pdf")
+
+pl_Δ = plot(
+    Δ,
+    x;
+    ylabel = "x",
+    ylims = (0, l()),
+    label = false,
+    title = "Δ(x)",
+    xticks = [minimum(Δ), sum(extrema(Δ)) / 2, maximum(Δ)],
+    # xlims = (0, maximum(Δ)),
+)
+pl_ū = plotsol(x, t, ū; title = "Filtered solution", ylabel = "")
+pl_markov = plotsol(x, t, markov; title = "Markovian term", ylabel = "")
+pl_noise = plotsol(x, t, noise; title = "Noise term", ylabel = "")
+pl_memory = plotsol(x, t, memory; title = "Memory term", ylabel = "")
+
+plot(pl_Δ, pl_ū; layout = grid(1, 2, widths=[0.3 ,0.7]))
+savefig(loc * "filtered.png")
+savefig(article * "filtered.pdf")
+plot(pl_Δ, pl_markov; layout = grid(1, 2, widths=[0.3 ,0.7]))
+savefig(loc * "markov.png")
+savefig(article * "markov.pdf")
+plot(pl_Δ, pl_noise; layout = grid(1, 2, widths=[0.3 ,0.7]))
+savefig(loc * "noise.png")
+savefig(article * "noise.pdf")
+plot(pl_Δ, pl_memory; layout = grid(1, 2, widths=[0.3 ,0.7]))
+savefig(loc * "memory.png")
+savefig(article * "memory.pdf")
 
 pl = plot(; xlabel = "t", title = "Term size (dū/dt)")
 plot!(t, norm.(eachcol(markov)); label = "Markov")
@@ -125,7 +177,7 @@ plot!(t, norm.(eachcol(memory)); label = "Memory")
 pl
 
 savefig(article * "termsize_ubar.pdf")
-savefig(loc * "termsize_ubar.png")
+savefig(loc * "termsize_ubar.pdf")
 
 # solve(
 #     IntegralProblem((s, _) -> B * D * exp(D * (t - s)) * C * W * u(t), 0, t),
@@ -181,33 +233,26 @@ plot!(t, norm.(eachcol(γ)))
 pl
 
 # Callback for studying convergence
-function create_callback(f, s, t)
+function create_callback(f, s, t, p₀)
     ū = s[:, 1, :, :]
     iplot = 1:10
     hist_i = Int[]
     hist_err = zeros(0)
     err_nomodel = relerr(
-        Array(
-            solve_matrix(
-                FM,
-                ū[:, iplot, 1],
-                t;
-                reltol = 1e-4,
-                abstol = 1e-6,
-            ),
-        ),
+        Array(solve_matrix(FM, ū[:, iplot, 1], t; reltol = 1e-4, abstol = 1e-6)),
         ū[:, iplot, :],
     )
     err_markov = relerr(
-        Array(
-            solve_matrix(
-                A,
-                ū[:, iplot, 1],
-                t;
-                reltol = 1e-4,
-                abstol = 1e-6,
-            ),
-        ),
+        Array(solve_matrix(A, ū[:, iplot, 1], t; reltol = 1e-4, abstol = 1e-6)),
+        ū[:, iplot, :],
+    )
+    err_w = relerr(
+        solve_equation(f, s[:, :, iplot, 1], zero(p₀), t; reltol = 1e-4, abstol = 1e-6)[
+            :,
+            1,
+            :,
+            :,
+        ],
         ū[:, iplot, :],
     )
     function callback(i, p)
@@ -217,11 +262,22 @@ function create_callback(f, s, t)
         println("Iteration $i \t average relative error $err")
         push!(hist_i, i)
         push!(hist_err, err)
-        pl = plot(; title = "Average relative error", xlabel = "Iterations")
-        hline!(pl, [err_nomodel]; color = 1, linestyle = :dash, label = "dv/dt = Fₘ v")
-        hline!(pl, [err_markov]; color = 2, linestyle = :dash, label = "dv/dt = A v")
-        plot!(pl, hist_i, hist_err; label = "dv/dt = A v + w")
+        pl = plot(;
+            title = "Average relative error ||v - ū|| / ||ū||",
+            xlabel = "Iterations",
+        )
+        hline!(pl, [err_nomodel]; color = 1, linestyle = :dash, label = "dv/dt = Fₘv")
+        hline!(pl, [err_markov]; color = 2, linestyle = :dash, label = "dv/dt = Av")
+        hline!(
+            pl,
+            [err_w];
+            color = 3,
+            linestyle = :dash,
+            label = "dv/dt = Av + w\ndw/dt = BCv",
+        )
+        plot!(pl, hist_i, hist_err; label = "dv/dt = Av + w\ndw/dt = BCv + NN(v,w)")
         display(pl)
+        pl
     end
 end
 
@@ -250,21 +306,16 @@ p₀, closure = convolutional_matrix_closure(
     ),
 )
 
-state = hcat(W * u₀, zeros(M))
-state = repeat(state, 1, 1, 5)
-closure(state, p₀, 0)
-
 function system(state, p, t)
     nsample = size(state, 3)
-    v, s = eachslice(state; dims = 2)
-    dv = A * v + s
+    v, w = eachslice(state; dims = 2)
+    # n = B * (exp(Matrix(D) * t) * e)
+    dv = A * v + w
     # dn = B * (D * (exp(Matrix(D) * t) * e)
-    ds = B * (C * v) + closure(state, p, t)
-    hcat(reshape(dv, :, 1, nsample), reshape(ds, :, 1, nsample))
+    dw = B * (C * v) + closure(state, p, t)
+    hcat(reshape(dv, :, 1, nsample), reshape(dw, :, 1, nsample))
 end
 system(state::AbstractMatrix, p, t) = reshape(system(reshape(state, :, 2, 1), p, t), :, 2)
-
-system(state, p₀, 0)
 
 # Maximum frequency in initial conditions
 K = N ÷ 2
@@ -295,10 +346,18 @@ ū_train = apply_filter(W, u_train)
 ū_valid = apply_filter(W, u_valid)
 ū_test = apply_filter(W, u_test)
 
+plotsol(ξ, t_train, u_train[:, 1, :]; title = "u")
+plotsol(ξ, t_valid, u_valid[:, 1, :]; title = "u")
+plotsol(ξ, t_test, u_test[:, 1, :]; title = "u")
+
+plotsol(x, t_train, ū_train[:, 1, :]; title = "ū")
+plotsol(x, t_valid, ū_valid[:, 1, :]; title = "ū")
+plotsol(x, t_test, ū_test[:, 1, :]; title = "ū")
+
 # Sub-filter solutions
-e_train = apply_filter(I - P * W, u_train)
-e_valid = apply_filter(I - P * W, u_valid)
-e_test = apply_filter(I - P * W, u_test)
+e_train = apply_filter(I - R * W, u_train)
+e_valid = apply_filter(I - R * W, u_valid)
+e_test = apply_filter(I - R * W, u_test)
 
 # Filtered time derivatives (for derivative fitting)
 dūdt_train = apply_filter(W, apply_filter(FN, u_train))
@@ -311,36 +370,64 @@ markov_valid = apply_filter(A, ū_valid)
 markov_test = apply_filter(A, ū_test)
 
 # Noise terms
-noise_train = reshape(
+o_train = reshape(
     mapreduce(t -> B * exp(Matrix(D) * t) * e_train[:, :, 1], hcat, t_train),
     M,
     n_train,
     :,
 )
-noise_valid = reshape(
+o_valid = reshape(
     mapreduce(t -> B * exp(Matrix(D) * t) * e_valid[:, :, 1], hcat, t_valid),
     M,
     n_valid,
     :,
 )
-noise_test = reshape(
+o_test = reshape(
     mapreduce(t -> B * exp(Matrix(D) * t) * e_test[:, :, 1], hcat, t_test),
     M,
     n_test,
     :,
 )
 
+plotsol(x, t_train, o_train[:, 1, :]; title = "Noise")
+plotsol(x, t_valid, o_valid[:, 1, :]; title = "Noise")
+plotsol(x, t_test, o_test[:, 1, :]; title = "Noise")
+
+# Time derivatives of noise terms
+dodt_train = reshape(
+    mapreduce(t -> B * D * exp(Matrix(D) * t) * e_train[:, :, 1], hcat, t_train),
+    M,
+    n_train,
+    :,
+)
+dodt_valid = reshape(
+    mapreduce(t -> B * D * exp(Matrix(D) * t) * e_valid[:, :, 1], hcat, t_valid),
+    M,
+    n_valid,
+    :,
+)
+dodt_test = reshape(
+    mapreduce(t -> B * D * exp(Matrix(D) * t) * e_test[:, :, 1], hcat, t_test),
+    M,
+    n_test,
+    :,
+)
+
 # Latent sub-filter variables
-w_train = dūdt_train - markov_train
-w_valid = dūdt_valid - markov_valid
-w_test = dūdt_test - markov_test
+w_train = dūdt_train - markov_train - o_train
+w_valid = dūdt_valid - markov_valid - o_valid
+w_test = dūdt_test - markov_test - o_test
+
+plotsol(x, t_train, w_train[:, 1, :]; title = "w")
+plotsol(x, t_valid, w_valid[:, 1, :]; title = "w")
+plotsol(x, t_test, w_test[:, 1, :]; title = "w")
 
 # Latent time derivatives
-dwdt_train = apply_filter(W * FN^2 - A * W * FN, u_train)
-dwdt_valid = apply_filter(W * FN^2 - A * W * FN, u_valid)
-dwdt_test = apply_filter(W * FN^2 - A * W * FN, u_test)
+dwdt_train = apply_filter(W * FN^2 - A * W * FN, u_train) - dodt_train
+dwdt_valid = apply_filter(W * FN^2 - A * W * FN, u_valid) - dodt_valid
+dwdt_test = apply_filter(W * FN^2 - A * W * FN, u_test) - dodt_test
 
-# States (ū, w)
+# States s = (ū, w)
 s_train = reshape(vcat(ū_train, w_train), M, 2, n_train, :)
 s_valid = reshape(vcat(ū_valid, w_valid), M, 2, n_valid, :)
 s_test = reshape(vcat(ū_test, w_test), M, 2, n_test, :)
@@ -350,7 +437,7 @@ dsdt_train = reshape(vcat(dūdt_train, dwdt_train), M, 2, n_train, :)
 dsdt_valid = reshape(vcat(dūdt_valid, dwdt_valid), M, 2, n_valid, :)
 dsdt_test = reshape(vcat(dūdt_test, dwdt_test), M, 2, n_test, :)
 
-callback = create_callback(system, s_valid, t_valid)
+callback = create_callback(system, s_valid, t_valid, p₀)
 callback(1, p₀)
 callback(2, p₀)
 
@@ -359,21 +446,55 @@ p_df = train(
         system,
         p,
 
-        # Merge solution and time dimension, with new size `(nx, nsolution*ntime)`
+        # Merge solution and time dimension, with new size `(nx, 2, nsolution*ntime)`
         reshape(dsdt_train, M, 2, :),
         reshape(s_train, M, 2, :);
 
         # Number of random data samples for each loss evaluation (batch size)
-        nuse = 200,
+        nuse = 100,
 
         # Tikhonov regularization weight
         λ = 1e-8,
     ),
-    # p₀,
-    p_df,
-    1000;
+    p₀,
+    # p_df,
+    5000;
     ncallback = 100,
-    callback = create_callback(system, s_valid, t_valid),
+    callback = create_callback(system, s_valid, t_valid, p₀),
 )
 
-savefig(loc * "loss.png")
+savefig(loc * "loss_df.png")
+
+p_tf = train(
+    p -> trajectory_loss(
+        system,
+        p,
+        s_train,
+        t_train;
+
+        # Number of initial conditions per evaluation
+        nsolution = 5,
+
+        # Number of random time instances per evaluation
+        ntime = 20,
+
+        # Tikhonov regularization weight
+        λ = 1.0e-8,
+
+        # Tolerances
+        reltol = 1e-4,
+        abstol = 1e-6,
+
+        ## Sensitivity algorithm for computing gradient
+        # sensealg = BacksolveAdjoint(; autojacvec = ZygoteVJP()),
+        sensealg = InterpolatingAdjoint(; autojacvec = ZygoteVJP()),
+        # sensealg = QuadratureAdjoint(; autojacvec = ZygoteVJP()),
+    ),
+    p₀,
+    # p_tf,
+    100;
+    ncallback = 10,
+    callback = create_callback(system, s_valid, t_valid, p₀),
+)
+
+savefig(loc * "loss_tf.png")

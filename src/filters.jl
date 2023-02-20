@@ -13,6 +13,8 @@ Gaussian filter weight at point `x` for filter width `Δ`.
 gaussian(Δ, x) = √(6 / π) / Δ * exp(-6x^2 / Δ^2)
 
 """
+    apply_filter(W, u)
+
 Apply filter to a collection of solutions.
 """
 function apply_filter(W, u)

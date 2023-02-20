@@ -54,7 +54,7 @@ function convolutional_closure(
         # u -> circshift(u, -1) - circshift(u, 1),
     )
 
-    Lux.setup(rng, NN)
+    # Lux.setup(rng, NN)
     params, state = Lux.setup(rng, NN)
     p, re = Lux.destructure(params)
 
@@ -62,7 +62,7 @@ function convolutional_closure(
     Compute closure term for given parameters `p`.
     """
     function closure end
-    closure(u, p, t) = first(Lux.apply(NN, u, re(p), state))
+    closure(u, p, t) = first(NN(u, re(p), state))
     closure(u::AbstractVector, p, t) = reshape(closure(reshape(u, :, 1), p, t), :)
 
     p, closure
@@ -129,7 +129,7 @@ function convolutional_matrix_closure(
     Compute closure term for given parameters `p`.
     """
     function closure end
-    closure(u, p, t) = first(Lux.apply(NN, u, re(p), state))
+    closure(u, p, t) = first(NN(u, re(p), state))
     closure(u::AbstractMatrix, p, t) = reshape(closure(reshape(u, size(u)..., 1), p, t), :)
 
     p, closure

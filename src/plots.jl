@@ -3,7 +3,15 @@
 
 Plot solution u.
 """
-plotsol(x, t, u; kwargs...) = heatmap(t, x, u; xlabel = "t", ylabel = "x", kwargs...)
+plotsol(x, t, u; kwargs...) = heatmap(
+    t,
+    x,
+    u;
+    xlabel = "t",
+    ylabel = "x",
+    # aspect_ratio = :equal,
+    kwargs...,
+)
 
 """
     plotmat(A; kwargs...)

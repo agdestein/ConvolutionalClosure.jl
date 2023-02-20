@@ -18,6 +18,10 @@ mkpath(loc)
 ξ = LinRange(0, l(), N + 1)[2:end]
 x = LinRange(0, l(), M + 1)[2:end]
 
+
+DN = circulant(N, [-1, 0, 1], N * [1, -2, 1])
+DM = circulant(M, [-1, 0, 1], M * [1, -2, 1])
+
 DN = circulant(N, [-1, 1], [-N / 2, N / 2])
 DM = circulant(M, [-1, 1], [-M / 2, M / 2])
 plotmat(DN; title = "DN")

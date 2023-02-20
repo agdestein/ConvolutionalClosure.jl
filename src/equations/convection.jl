@@ -42,8 +42,7 @@ function (e::Convection{6})(u, p, t)
     u₊₁ = circshift(u, -1)
     u₊₂ = circshift(u, -2)
     u₊₃ = circshift(u, -3)
-    error()
-    du = @. -(-u₊₂ + 8u₊₁ - 8u₋₁ + u₋₂) / 12Δx
+    du = @. -(u₊₃ - 9u₊₂ + 45u₊₁ - 45u₋₁ + 9u₋₂ - u₋₃) / 60Δx
     du
 end
 
