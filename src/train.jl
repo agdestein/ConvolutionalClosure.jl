@@ -12,7 +12,6 @@ function train(
     for i ∈ 1:niter
         grad = first(gradient(loss, p))
         opt, p = Optimisers.update(opt, p, grad)
-        # i % ncallback == 0 ? callback(i, p) : println("Iteration $i")
         i % ncallback == 0 && callback(i, p)
     end
     p

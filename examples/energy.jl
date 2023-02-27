@@ -11,6 +11,7 @@ end                                                 #src
 
 using ConvolutionalClosure
 using Expokit
+using JLD2
 using LinearAlgebra
 using Lux
 using Optimisers
@@ -21,6 +22,8 @@ using Random
 using SciMLSensitivity
 using SparseArrays
 using Zygote
+
+Random.seed!(123)
 
 apply_mat(u, p, t) = p * u
 function solve_matrix(A, u₀, t, solver = Tsit5(); kwargs...)
@@ -35,8 +38,8 @@ s = 10
 M = 50
 N = s * M
 
-loc = "output/expansion/N$(N)_M$(M)/"
-mkpath(loc)
+output = "output/energy/N$(N)_M$(M)/"
+mkpath(output)
 
 y = LinRange(0, l(), N + 1)[2:end]
 x = LinRange(0, l(), M + 1)[2:end]
@@ -49,24 +52,40 @@ plotmat(FN; title = "FN")
 plotmat(FM; title = "FM")
 
 # Filter widths
-ΔΔ(x) = 3 / 100 * l() * (1 + 1 / 3 * sin(2π * x / l()))
+ΔΔ(x) = 5 / 100 * l() * (1 + 1 / 3 * sin(2π * x / l()))
 Δ = ΔΔ.(x)
 plot(x, Δ; xlabel = "x", title = "Filter width")
 
 # Δ = 0.26 * s * l() / M
 # # Δ = 0.5 * s * l() / M
 
+# W = kron(I(M), ones(1, s)) / N
+# plotmat(W)
+
 # Discrete filter matrix
 W = sum(gaussian.(Δ, x .- y' .- z .* l()) for z ∈ -2:2)
 W = W ./ sum(W; dims = 2)
-W[abs.(W).<1e-6] .= 0
+W[abs.(W).<1e-4] .= 0
 W = W ./ sum(W; dims = 2)
 W = sparse(W)
 dropzeros!(W)
 # W = W / sqrt(λmax) 1.0000000003
-plotmat(W; title = "Discrete filter")
+plotmat(W; title = "W")
 
 plotmat(W .!= 0; title = "Discrete filter (sparsity)")
+
+savefig(loc * "W.pdf")
+# savefig(loc * "W_wide.png")
+# savefig(loc * "W_uniform.png")
+
+# Linear interpolant
+R = W' / Matrix(W * W')
+plotmat(R)
+
+plotmat(W * W')
+plotmat(W' * W)
+plotmat(W * R)
+plotmat(R * W)
 
 # # Create data
 #
@@ -96,79 +115,17 @@ plot(y, u₀_train[:, 1:3]; xlabel = "x", label = ["u₁" "u₂" "u₃"], title 
 
 savefig(loc * "data_samples.pdf")
 
-"""
-    apply_stencils(u, p)
-
-Apply the periodically extended multi-diagonal
-matrix `circdiag(-r => p[:, 1], ..., r => p[:, end])`
-to `u` for the `M` stencils `p` of size `(M, 2r+1)`.
-"""
-function apply_stencils(u, p)
-    d = size(p, 2)
-    r = d ÷ 2
-    s, ssupp... = size(u)
-    u = reshape(u, s, 1, ssupp...)
-    du = p .* reduce(hcat, circshift(u, -i) for i = -r:r)
-    du = sum(du; dims = 2)
-    reshape(du, s, ssupp...)
-end
-
-function transpose_kernel(p)
-    d = size(p, 2)
-    r = d ÷ 2
-    p = reverse(p; dims = 2)
-    p = reduce(hcat, circshift(p, -(-r - 1 + i)) for (i, p) ∈ enumerate(eachcol(p)))
-    p
-end
-
-"""
-    apply_stencils_transpose(u, p)
-
-Apply the transpose of the periodically extended multi-diagonal
-matrix `circdiag(-r => p[:, 1], ..., r => p[:, end])`
-to `u` for the `M` stencils `p` of size `(M, 2r+1)`.
-"""
-function apply_stencils_transpose(u, p)
-    d = size(p, 2)
-    r = d ÷ 2
-    p = reverse(p; dims = 2)
-    # p = reduce(hcat, circshift(p[:, r+1+i], -i) for i = -r:r)
-    p = reduce(hcat, circshift(p, -(-r - 1 + i)) for (i, p) ∈ enumerate(eachcol(p)))
-    # p = hcat([circshift(p[:, r+1+i], -i) for i = -r:r]...)
-    apply_stencils(u, p)
-end
-
-"""
-    apply_stencils_nonsquare(u, p)
-
-For the `M` stencils `p` of size `(M, 2r+1)`.
-"""
-function apply_stencils_nonsquare(u, p)
-    N, ssupp... = size(u)
-    M, d = size(p)
-    s = N ÷ M
-    # pfine = kron(p, fill(1, s))
-    NM = Zygote.@ignore kron(I(M), fill(1, s))
-    pfine = NM * p
-    Tu = apply_stencils(u, pfine)
-    Tu = reshape(Tu, N, :)
-    Tu = Tu[s:s:end, :]
-    reshape(Tu, M, ssupp...)
-end
-
-#=
-a b c d e
-1 1 1 1 1 1 1 1 1 1 1 1
-1       1       1
-
-a b c d e
-1 1 1 1 1 1 1 1 1 1 1 1
-1       1       1
-
-d e               a b c
-1 1 1 1 1 1 1 1 1 1 1 1
-1       1       1
-=#
+#   a b c d e
+# 1 1 1 1 1 1 1 1 1 1 1 1
+#       1       1       1
+#
+#           a b c d e
+# 1 1 1 1 1 1 1 1 1 1 1 1
+#       1       1       1
+#
+# d e               a b c
+# 1 1 1 1 1 1 1 1 1 1 1 1
+#       1       1       1
 
 plot(; xlabel = "x", title = "Local filter kernels")
 plot!(y, W[10, :]; label = @sprintf "x = %.2f" x[10])
@@ -181,17 +138,76 @@ maximum(i -> length(W[i, :].nzval), 1:M)
 
 scatter(y, W[11, :])
 
+# Energy compression
+vals, vecs = eigen(Matrix(I - s * W'W))
+
+scatter(vals; label = false, color = map(v -> v > 0 ? 1 : 2, vals), title = "Eigenvalues")
+
+savefig(loc * "eigenvalues.pdf")
+# savefig(loc * "eigenvalues_wide.pdf")
+# savefig(loc * "eigenvalues_uniform.pdf")
+
+plotmat(I - s * W'W)
+plotmat(W'W)
+
+i = 55:75
+plot(
+    y,
+    vecs[:, i];
+    # label = i',
+    xlabel = "x",
+    label = false,
+    title = "Eigenvectors $i of I/N - W'W/M",
+)
+
+plot!(y, 0.4ΔΔ.(y) .- 0.085)
+
+plot(
+    (plot(
+        y,
+        vecs[:, i];
+        # label = i',
+        label = false,
+        xticks = false,
+        yticks = false,
+        # xlabel = "x",
+        title = i,
+    ) for i = [1:7; 49; 50; 51; 52; 500])...,
+    # layout = (2, 1),
+    # title = "Eigenvectors of I/N - W'W/M",
+    # size = (1200, 800),
+    size = (800, 500),
+)
+
+plot(x, W * vecs[:, 500])
+
+savefig(loc * "eigenvectors.pdf")
+# savefig(loc * "eigenvectors_wide.pdf")
+# savefig(loc * "eigenvectors_uniform.pdf")
+
+w = vecs * Diagonal(vecs' * u₀)
+
+i = 1:50
+plot(y, u₀)
+plot!(x, W * u₀)
+plot!(y, sum(w[:, i]; dims = 2))
+plot!(y, u₀ - sum(w[:, i]; dims = 2))
+
+vals
+r = 1
+TT = sqrt(r) .* sqrt.(vals[1:r]) .* vecs[:, 1:r]'
+
 T = apply_stencils_nonsquare
 
 function loss_comp(p, u)
-    ū = W * u
+    v = W * u
     w = T(u, p)
-    Eū = ū .* ū
+    Ev = v .* v
     Ew = w .* w
     Eu = u .* u
-    sum(abs2, sum(Eū; dims = 1) ./ M + sum(Ew; dims = 1) ./ M - sum(Eu; dims = 1) ./ N) /
+    sum(abs2, sum(Ev; dims = 1) ./ M + sum(Ew; dims = 1) ./ M - sum(Eu; dims = 1) ./ N) /
     size(u, 2)
-    # sum(abs2, eachcol(Eū + Ew - Eu)) / size(u, 2)
+    # sum(abs2, eachcol(Ev + Ew - Eu)) / size(u, 2)
 end
 
 function loss_comp(p; u = u₀_compress, nuse = 100)
@@ -224,23 +240,23 @@ first(gradient(loss_comp, τ))
     ncallback = 10,
 )
 
-ū₀ = W * u₀
+v₀ = W * u₀
 w₀ = T(u₀, τ)
-q₀ = [ū₀; w₀]
+q₀ = [v₀; w₀]
 
 plot(; title = "Initial conditions", xlabel = "x")
 plot!(y, u₀; label = "u")
-plot!(x, ū₀; label = "Wu")
+plot!(x, v₀; label = "Wu")
 plot!(x, w₀; label = "Tu")
-# plot!(x, ū₀ + w₀; label = "ū + w")
+# plot!(x, v₀ + w₀; label = "v + w")
 
 savefig(loc * "initial_conditions_energy.pdf")
 
 plot(; xlabel = "x")
 plot!(y, u₀ .^ 2 ./ 2; label = "e(u)")
-plot!(x, ū₀ .^ 2 ./ 2; label = "e(ū)")
+plot!(x, v₀ .^ 2 ./ 2; label = "e(v)")
 plot!(x, w₀ .^ 2 ./ 2; label = "e(w)")
-# plot!(x, ū₀ .^ 2 ./ 2 .+ w₀ .^ 2 ./ 2; label = "e(ū) + e(w)")
+# plot!(x, v₀ .^ 2 ./ 2 .+ w₀ .^ 2 ./ 2; label = "e(v) + e(w)")
 
 # Evaluation times
 t = LinRange(0.0, 1.0, 501)
@@ -255,10 +271,10 @@ u_valid = solve_matrix(FN, u₀_valid, t_valid; reltol = 1e-4, abstol = 1e-6)
 u_test = solve_matrix(FN, u₀_test, t_test; reltol = 1e-4, abstol = 1e-6)
 
 # Filtered solutions
-ū = apply_filter(W, u)
-ū_train = apply_filter(W, u_train)
-ū_valid = apply_filter(W, u_valid)
-ū_test = apply_filter(W, u_test)
+v = apply_filter(W, u)
+v_train = apply_filter(W, u_train)
+v_valid = apply_filter(W, u_valid)
+v_test = apply_filter(W, u_test)
 
 # Latent solutions
 w = reshape(T(Array(u), τ), M, :)
@@ -267,10 +283,10 @@ w_valid = reshape(T(reshape(Array(u_valid), N, :), τ), M, n_valid, :)
 w_test = reshape(T(reshape(Array(u_test), N, :), τ), M, n_test, :)
 
 # Augmented states
-q = [ū; w]
-q_train = [ū_train; w_train]
-q_valid = [ū_valid; w_valid]
-q_test = [ū_test; w_test]
+q = [v; w]
+q_train = [v_train; w_train]
+q_valid = [v_valid; w_valid]
+q_test = [v_test; w_test]
 
 # Time derivatives
 dudt = apply_filter(FN, u)
@@ -279,10 +295,10 @@ dudt_valid = apply_filter(FN, u_valid)
 dudt_test = apply_filter(FN, u_test)
 
 # Filtered time derivatives
-dūdt = apply_filter(W, dudt)
-dūdt_train = apply_filter(W, dudt_train)
-dūdt_valid = apply_filter(W, dudt_valid)
-dūdt_test = apply_filter(W, dudt_test)
+dvdt = apply_filter(W, dudt)
+dvdt_train = apply_filter(W, dudt_train)
+dvdt_valid = apply_filter(W, dudt_valid)
+dvdt_test = apply_filter(W, dudt_test)
 
 # Filtered latent time derivatives
 dwdt = reshape(T(Array(dudt), τ), M, :)
@@ -291,15 +307,74 @@ dwdt_valid = reshape(T(reshape(Array(dudt_valid), N, :), τ), M, n_valid, :)
 dwdt_test = reshape(T(reshape(Array(dudt_test), N, :), τ), M, n_test, :)
 
 # Augmented time derivatives
-dqdt = [dūdt; dwdt]
-dqdt_train = [dūdt_train; dwdt_train]
-dqdt_valid = [dūdt_valid; dwdt_valid]
-dqdt_test = [dūdt_test; dwdt_test]
+dqdt = [dvdt; dwdt]
+dqdt_train = [dvdt_train; dwdt_train]
+dqdt_valid = [dvdt_valid; dwdt_valid]
+dqdt_test = [dvdt_test; dwdt_test]
+
+decomp = svd(Matrix(W))
+
+UU, SS, VV = decomp
+
+plotmat(R)
+plotmat(VV*Diagonal(1 ./ SS) * UU')
+
+plotmat(R * W)
+
+vals, vecs = eigen(I - VV * VV')
+scatter(vals)
+
+
+plot(; xlabel = "x")
+plot!(y, u₀)
+plot!(y, R * W * u₀)
+plot!(y, (I - VV * VV') * u₀)
+# plot!(y, vecs * vecs' * u₀)
+plot!(y, vecs[:, M+1:end] * vecs[:, M+1:end]' * u₀)
+
+plot(y, vecs[:, M+1:end] * vecs[:, M+1:end]' * u₀)
+plot(y, vecs * vecs' * u₀)
+plot(y, vecs[:, 54])
+
+plotmat(I - VV * VV')
+
+UU
+SS
+VV
+
+plotmat(UU)
+plot(y, VV[:, 1:6])
+
+dec = svd(VV')
+
+plotmat(dec.U)
+scatter(dec.S)
+plot(y, dec.V[:, 34])
+
+plotmat(W' * UU * Diagonal(1 ./ SS.^2) * UU')
+
+scatter(decomp.S)
+scatter(vals)
+scatter!(1 .- decomp.S.^2 .* 10)
+
+r = 50
+TT = vecs[:, 1:r] * Diagonal(vals[1:r]) * vecs[:, 1:r]'
+plotmat(TT)
+
+plot(; xlabel = "x")
+plot!(y, u₀; label = "u")
+plot!(y, s * W' * v₀; label = "Rv")
+# plot!(y, TT * u₀; label = "T'Tu")
+plot!(y, s * W' * v₀ + TT * u₀; label = "Rv + T'Tu")
+
+Ew = sum(u .* (TT * u); dims = 1)[:] / 2N
+r
 
 plot(; title = "Kinetic energy", xlabel = "t", legend = :right)
 plot!(t, E.(eachcol(u)); label = "E(u)")
-plot!(t, E.(eachcol(ū)); label = "E(Wu)")
-plot!(t, E.(eachcol(ū)) .+ E.(eachcol(w)); label = "E(Wu) + E(Tu)")
+plot!(t, E.(eachcol(v)); label = "E(Wu)")
+# plot!(t, E.(eachcol(v)) + Ew; label = "E(Wu) + E(Tu)")
+plot!(t, E.(eachcol(v)) .+ E.(eachcol(w)); label = "E(Wu) + E(Tu)")
 # ylims!((0, ylims()[2]))
 
 savefig(loc * "energy_compression.pdf")
@@ -314,9 +389,9 @@ p₀12 = 0.01 * randn(M, d12)
 p₀22 = 0.01 * randn(M, d22)
 
 # This should be zero
-ū₀' * (apply_stencils(ū₀, p₀11) - apply_stencils_transpose(ū₀, p₀11))
-ū₀' * (apply_stencils(ū₀, p₀12) - apply_stencils_transpose(ū₀, p₀12))
-ū₀' * (apply_stencils(ū₀, p₀22) - apply_stencils_transpose(ū₀, p₀22))
+v₀' * (apply_stencils(v₀, p₀11) - apply_stencils_transpose(v₀, p₀11))
+v₀' * (apply_stencils(v₀, p₀12) - apply_stencils_transpose(v₀, p₀12))
+v₀' * (apply_stencils(v₀, p₀22) - apply_stencils_transpose(v₀, p₀22))
 
 function Q(q, p, t)
     p11 = p[:, 1:d11]
@@ -333,16 +408,16 @@ end
 
 # Callback for studying convergence
 function create_callback(Q, q, t; iplot = 1:10)
-    ū = q[1:M, iplot, :]
+    v = q[1:M, iplot, :]
     # w = q[M+1:end, iplot, :]
     hist_i = Int[]
     hist_err = zeros(0)
     err_nomodel =
-        relerr(Array(solve_matrix(FM, ū[:, :, 1], t; reltol = 1e-4, abstol = 1e-6)), ū)
+        relerr(Array(solve_matrix(FM, v[:, :, 1], t; reltol = 1e-4, abstol = 1e-6)), v)
     function callback(i, p)
         sol = solve_equation(Q, q[:, iplot, 1], p, t; reltol = 1e-4, abstol = 1e-6)
-        v = sol[1:M, :, :]
-        err = relerr(v, ū)
+        vpred = sol[1:M, :, :]
+        err = relerr(vpred, v)
         println("Iteration $i \t average relative error $err")
         push!(hist_i, i)
         push!(hist_err, err)
@@ -353,7 +428,7 @@ function create_callback(Q, q, t; iplot = 1:10)
     end
 end
 
-q₀ = [ū₀; w₀]
+q₀ = [v₀; w₀]
 p₀ = [p₀11 p₀12 p₀22]
 size(p₀)
 
@@ -453,7 +528,7 @@ plot(; xlabel = "Offset index", title = "Convection stencil")
 bar!(-r11:r11, kref6[:] / M; label = "Coarse discretization (6th order)")
 bar!(-r11:r11, sum(k11; dims = 1)[:] / M / M; label = "Average Learned")
 bar!(-r11:r11, kref2[:] / M; label = "Coarse discretization (2nd order)")
-scatter!(-r11:r11, k11' /M; label = false, color = 2, opacity = 0.2)
+scatter!(-r11:r11, k11' / M; label = false, color = 2, opacity = 0.2)
 
 savefig(loc * "convection_stencil.pdf")
 
@@ -464,28 +539,28 @@ cb(20_004, pref)
 
 
 P = [k11 zeros(M, M - 7)]
-P = reduce(vcat, circshift(P[[4+i], :], (0, i)) for i = -3:M-4)
+P = reduce(vcat, circshift(P[[4 + i], :], (0, i)) for i = -3:M-4)
 plotmat(P; title = "K11")
 
 savefig(loc * "K11.pdf");
 
 kreff6 = repeat(kref6, M)
 Pref = [kreff6 zeros(M, M - 7)]
-Pref = reduce(vcat, circshift(Pref[[4+i], :], (0, i)) for i = -3:M-4)
+Pref = reduce(vcat, circshift(Pref[[4 + i], :], (0, i)) for i = -3:M-4)
 
 plotmat(P)
 plotmat(Pref)
 
 k12
 P12 = [k12 zeros(M, M - 7)]
-P12 = reduce(vcat, circshift(P12[[4+i], :], (0, i)) for i = -3:M-4)
+P12 = reduce(vcat, circshift(P12[[4 + i], :], (0, i)) for i = -3:M-4)
 plotmat(P12; title = "K12")
 
 savefig(loc * "K12.pdf");
 
 k22
 P22 = [k22 zeros(M, M - 7)]
-P22 = reduce(vcat, circshift(P22[[4+i], :], (0, i)) for i = -3:M-4)
+P22 = reduce(vcat, circshift(P22[[4 + i], :], (0, i)) for i = -3:M-4)
 plotmat(P22; title = "K22")
 
 savefig(loc * "K22.pdf");
@@ -496,9 +571,16 @@ wmodel = qmodel[M+1:end, 1, :]
 
 plot(; title = "Kinetic energy", xlabel = "t", legend = :right)
 plot!(t, E.(eachcol(u)); label = "E(u)")
-plot!(t, E.(eachcol(ū)); label = "E(Wu)")
-plot!(t, E.(eachcol(ū)) .+ E.(eachcol(w)); label = "E(Wu) + E(Tu)")
-plot!(t, E.(eachcol(vmodel)) .+ E.(eachcol(wmodel)); label = "E(q) for all K", color = 3, linestyle = :dash)
+plot!(t, E.(eachcol(v)); label = "E(Wu)")
+# plot!(t, E.(eachcol(vmodel)); label = "E(qv)")
+plot!(t, E.(eachcol(v)) .+ E.(eachcol(w)); label = "E(Wu) + E(Tu)")
+plot!(
+    t,
+    E.(eachcol(vmodel)) .+ E.(eachcol(wmodel));
+    label = "E(q) for all K",
+    color = 3,
+    linestyle = :dash,
+)
 # ylims!((0, ylims()[2]))
 
 savefig(loc * "energy_compression_q.pdf")
@@ -507,10 +589,15 @@ savefig(loc * "energy_compression_q.pdf")
 for (i, t) ∈ collect(enumerate(t))#[1:200]
     pl = plot(; xlabel = "x", title = @sprintf("t = %.2f", t), ylims = extrema(u[:, :]))
     plot!(pl, y, u[i]; label = "Unfiltered")
-    plot!(pl, x, ū[:, i]; label = "Filtered exact")
+    plot!(pl, x, v[:, i]; label = "Filtered exact")
     # plot!(pl, x, vmodel[:, i]; label = "Filtered")
     plot!(pl, x, w[:, i]; label = "Sub exact")
     # scatter!(pl, x, wmodel[:, i]; label = "Sub")
     display(pl)
     sleep(0.05) # Time for plot pane to update
 end
+
+filename = joinpath(output, "stencils.jld2")
+# jldsave(filename; τ, p11, p12, p22)
+# τ, p11, p12, p22 = load(filename, "τ", "p11", "p12", "p22")
+# p = [p11 p12 p22]

@@ -59,6 +59,8 @@ function convolutional_closure(
     p, re = Lux.destructure(params)
 
     """
+        closure(u, p, t) 
+
     Compute closure term for given parameters `p`.
     """
     function closure end

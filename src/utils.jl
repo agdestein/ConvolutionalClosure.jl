@@ -82,3 +82,63 @@ function linear_interpolator(L, x, y)
     IP[:, end] += P[:, 1]
     sparse(IP)
 end
+
+"""
+    apply_stencils(u, p)
+
+Apply the periodically extended multi-diagonal
+matrix `circdiag(-r => p[:, 1], ..., r => p[:, end])`
+to `u` for the `M` stencils `p` of size `(M, 2r+1)`.
+"""
+function apply_stencils(u, p)
+    d = size(p, 2)
+    r = d ÷ 2
+    s, ssupp... = size(u)
+    u = reshape(u, s, 1, ssupp...)
+    du = p .* reduce(hcat, circshift(u, -i) for i = -r:r)
+    du = sum(du; dims = 2)
+    reshape(du, s, ssupp...)
+end
+
+function transpose_kernel(p)
+    d = size(p, 2)
+    r = d ÷ 2
+    p = reverse(p; dims = 2)
+    p = reduce(hcat, circshift(p, -(-r - 1 + i)) for (i, p) ∈ enumerate(eachcol(p)))
+    p
+end
+
+"""
+    apply_stencils_transpose(u, p)
+
+Apply the transpose of the periodically extended multi-diagonal
+matrix `circdiag(-r => p[:, 1], ..., r => p[:, end])`
+to `u` for the `M` stencils `p` of size `(M, 2r+1)`.
+"""
+function apply_stencils_transpose(u, p)
+    d = size(p, 2)
+    r = d ÷ 2
+    p = reverse(p; dims = 2)
+    # p = reduce(hcat, circshift(p[:, r+1+i], -i) for i = -r:r)
+    p = reduce(hcat, circshift(p, -(-r - 1 + i)) for (i, p) ∈ enumerate(eachcol(p)))
+    # p = hcat([circshift(p[:, r+1+i], -i) for i = -r:r]...)
+    apply_stencils(u, p)
+end
+
+"""
+    apply_stencils_nonsquare(u, p)
+
+For the `M` stencils `p` of size `(M, 2r+1)`.
+"""
+function apply_stencils_nonsquare(u, p)
+    N, ssupp... = size(u)
+    M = size(p, 1)
+    s = N ÷ M
+    # pfine = kron(p, fill(1, s))
+    NM = Zygote.@ignore kron(I(M), fill(1, s))
+    pfine = NM * p
+    Tu = apply_stencils(u, pfine)
+    Tu = reshape(Tu, N, :)
+    Tu = Tu[s:s:end, :]
+    reshape(Tu, M, ssupp...)
+end
