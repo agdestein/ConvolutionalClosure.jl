@@ -38,6 +38,9 @@ s = 10
 M = 50
 N = s * M
 
+loc = "output/energy/N$(N)_M$(M)/"
+mkpath(loc)
+
 output = "output/energy/N$(N)_M$(M)/"
 mkpath(output)
 

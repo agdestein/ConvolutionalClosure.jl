@@ -14,6 +14,21 @@ plotsol(x, t, u; kwargs...) = heatmap(
 )
 
 """
+    plotfield(x, y, u; kwargs...)
+
+Plot solution u.
+"""
+plotfield(x, y, u; kwargs...) = heatmap(
+    x,
+    y,
+    u';
+    xlabel = "x",
+    ylabel = "y",
+    # aspect_ratio = :equal,
+    kwargs...,
+)
+
+"""
     plotmat(A; kwargs...)
 
 Plot matrix.

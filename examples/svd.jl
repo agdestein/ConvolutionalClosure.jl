@@ -27,7 +27,7 @@ y = LinRange(0, l(), N + 1)[2:end]
 # Filter widths
 ΔΔ(x) = 5 / 100 * l() * (1 + 1 / 3 * sin(2π * x / l()))
 Δ = ΔΔ.(x)
-plot(x, Δ; xlabel = "x", title = "Filter width")
+plot(x, Δ; legend = false, xlabel = "x", title = "Filter width Δ(x)")
 
 # Δ = 3 / 100 * l()
 # Δ = 0.5 * s * l() / M
@@ -40,6 +40,7 @@ plot(x, Δ; xlabel = "x", title = "Filter width")
 W = sum(-1:1) do z
     d = x .- y' .- z .* l()
     gaussian.(Δ, d) .* (abs.(d) .≤ 3 ./ 2 .* Δ)
+    # top_hat.(Δ, d)
 end
 W = W ./ sum(W; dims = 2)
 W = sparse(W)
@@ -68,23 +69,101 @@ plotmat(W * R)
 V = Ξ'
 P = Ξ
 
+k = 9
+for k = 1:M
+    ind = 1:k
+    # ind = k:k
+    Wk = Φ[:, ind] * Diagonal(σ[ind]) * Ψ[:, ind]'
+    display(plotmat(Wk; title = "k = $k"))
+    sleep(0.1)
+end
+
+i = [1:7; 10; 20; 30; 40; 50]
+indind = k -> 1:k
+# indind = k -> k:k
+plot(
+    (plotmat(
+        Φ[:, indind(k)] * Diagonal(σ[indind(k)]) * Ψ[:, indind(k)]';
+        xticks = iplot ≤ 4,
+        yticks = iplot ∈ [1, 5, 9],
+        # xlabel = "x",
+        colorbar = false,
+        title = k,
+    ) for (iplot, k) = enumerate(i))...,
+    # layout = (2, 1),
+    # title = "Eigenvectors of I/N - W'W/M",
+    # size = (1200, 800),
+    size = (800, 500),
+    # plot_title = "Truncated filter matrix",
+)
+
+# savefig(loc * "nonuniform/Wk.pdf")
+# savefig(loc * "nonuniform/Wkall.pdf")
+
 plotmat(V)
 plotmat(P)
+plotmat(P * V)
 plotmat(Ψ)
 
-i =  16; sticks(y, Ψ[:, i]; title = "Right singular vectors $i", xlabel = "x")
-i = 284; sticks(y, P[:, i]; title = "Right singular vectors $i", xlabel = "x")
-n = 110; plot(y, (P[n, :]' * V)'; title = "Right singular vectors $n", xlabel = "x")
+i =  20; plot(y, Ψ[:, i]; title = "Right singular vectors $i", xlabel = "x")
+i = 316; plot(y, P[:, i]; title = "Right singular vectors $i", xlabel = "x")
 
 for i = 1:M
     display(plot(y, Ψ[:, i]; title = "Right singular vectors $i", xlabel = "x"))
     sleep(0.1)
 end
 
-for i = 1:1:100
-    display(plot(y, P[:, i]; title = "Right singular vectors $i", xlabel = "x"))
+for k = 300:400
+    display(plot(y, P[:, k]; legend = false, title = "ξₖ, k = $k", xlabel = "x"))
     sleep(0.05)
 end
+
+
+i = [1:7; 10; 20; 30; 40; 50]
+plot(
+    (plot(
+        y,
+        Ψ[:, i];
+        # label = i',
+        label = false,
+        xticks = iplot ≥ 9,
+        xlabel = iplot ≥ 9 ? "x" : "",
+        yticks = false,
+        # xlabel = "x",
+        title = i,
+    ) for (iplot, i) = enumerate(i))...,
+    # layout = (2, 1),
+    # title = "Eigenvectors of I/N - W'W/M",
+    # size = (1200, 800),
+    size = (800, 500),
+)
+
+# savefig(loc * "nonuniform/singular_vectors.pdf")
+
+i = [1, 50, 100, 150, 200, 250]
+plot(
+    (plot(
+        y,
+        Ξ[:, i];
+        label = false,
+        xticks = iplot ≥ 4,
+        xlabel = iplot ≥ 4 ? "x" : "",
+        yticks = false,
+        # xlabel = "x",
+        title = "k = $i",
+    ) for (iplot, i) = enumerate(i))...,
+    # layout = (2, 1),
+    # title = "Eigenvectors of I/N - W'W/M",
+    # size = (1200, 800),
+    plot_title = "Right singular vectors ξₖ",
+    size = (800, 500),
+)
+
+# savefig(loc * "nonuniform/singular_vectors_zero.pdf")
+
+scatter(σ; title = "Singular values", legend = false)
+
+# savefig(loc * "nonuniform/singular_values.pdf")
 
 """
 Linear-ish frequency decay.
@@ -96,10 +175,17 @@ kmax = N ÷ 2
 
 u = create_data(y, kmax, 1; decay)[:]
 
-plot(; xlabel = "x", title = "Signal")
-plot!(y, u; label = "u")
-plot!(y, R * W * u;  label = "RWu")
-plot!(y, P * V * u;  label = "PVu")
+k = 3
+for k = 1:M
+    i = 1:k
+    pl = plot(; xlabel = "x", title = "Signal")
+    plot!(y, u; label = "u")
+    # plot!(y, R * W * u;  label = "RWu")
+    plot!(y, Ψ[:, i] * Ψ[:, i]' * u;  label = "ΨiΨi'u")
+    plot!(y, P * V * u;  label = "PVu")
+    display(pl)
+    sleep(0.1)
+end
 
 ke(u) = u^2 / 2
 
@@ -136,7 +222,8 @@ plot(x, abs.(R[500, :]); yscale = :log10)
 plot(y, abs.(R[:, 31]); yscale = :log10)
 
 # Convection
-F = circulant(N, [-1, 1], [-N / 2, N / 2])
+# F = circulant(N, -3:3, N / l() * [1, -9, 45, 0, -45, 9, -1] / 60)
+F = -circulant(N, [-1, 1], [-N / 2, N / 2])
 
 # Mori-Zwanzig matrices
 A = W * F * R
@@ -144,10 +231,14 @@ B = W * F * P
 C = V * F * R
 D = V * F * P
 
-plotmat(A)
-plotmat(B)
-plotmat(C)
-plotmat(D)
+plA = plotmat(A; title = "A")
+plB = plotmat(B; title = "B")
+plC = plotmat(C; title = "C")
+plD = plotmat(D; title = "D")
+
+plot(plA, plB, plC, plD; size = (800, 500))
+
+# savefig(loc * "nonuniform/mzmat.pdf")
 
 sticks(x, A[10, :]; xlims = (0, 1))
 

@@ -26,7 +26,7 @@ M = 100
 loc = "output/N$(N)_M$(M)/"
 mkpath(loc)
 
-ξ = LinRange(0, l(), N + 1)[2:end]
+y = LinRange(0, l(), N + 1)[2:end]
 x = LinRange(0, l(), M + 1)[2:end]
 
 FN = circulant(N, [-1, 1], [-N / 2, N / 2])
@@ -44,7 +44,7 @@ plotmat(FM; title = "FM")
 Δ = 4 * l() / M
 
 # Discrete filter matrix
-W = sum(gaussian.(Δ, x .- ξ' .- z .* l()) for z ∈ -2:2)
+W = sum(gaussian.(Δ, x .- y' .- z .* l()) for z ∈ -2:2)
 W = W ./ sum(W; dims = 2)
 W[abs.(W).<1e-6] .= 0
 W = W ./ sum(W; dims = 2)
@@ -54,11 +54,11 @@ plotmat(W; title = "Discrete filter")
 plotmat(W .!= 0; title = "Discrete filter (sparsity)")
 
 # # Piece-wise constant interpolant
-# R = constant_interpolator(l(), x, ξ)
+# R = constant_interpolator(l(), x, y)
 # plotmat(R)
 
 # Linear interpolant
-R = linear_interpolator(l(), x, ξ)
+R = linear_interpolator(l(), x, y)
 plotmat(R)
 
 # # Full reconstructor
@@ -92,16 +92,16 @@ Linear-ish frequency decay.
 decay(k) = 1 / (1 + abs(k))^1.2
 
 # Initial conditions
-u₀ = create_data(ξ, N ÷ 2, 1; decay)[:]
+u₀ = create_data(y, N ÷ 2, 1; decay)[:]
 # for i = 1:5
 #     u₀ = R * W * u₀
 # end
 
 pl = plot(; xlabel = "x", title = "Example signal")
-plot!(ξ, u₀; label = "u")
+plot!(y, u₀; label = "u")
 # scatter!(x, W * u₀; label = "Filtered")
-plot!(ξ, R * W * u₀; label = "R W u")
-plot!(ξ, (I - R * W) * u₀; label = "u'")
+plot!(y, R * W * u₀; label = "RWu")
+plot!(y, P * V * u₀; label = "PVu")
 pl
 
 savefig(loc * "example_signal.pdf")
@@ -116,21 +116,22 @@ u = solve_matrix(FN, u₀, t; reltol = 1e-8, abstol = 1e-10)
 ū = W * u
 
 # Unresolved solution
-e = (I - R * W) * u
+e = V * u
 
 # Filtered time derivatives
 dūdt = W * FN * u
 
 # Kinetic energy
 E(u) = 1 / 2 * l() / length(u) * u'u
+E = u -> 1 / 2 * l() / length(u) * u'u
 pl = plot(; xlabel = "t", title = "Kinetic energy")
 plot!(t, map(E, eachcol(u)); label = "E(u)")
 plot!(t, map(E, eachcol(R * ū)); label = "E(ū)")
-plot!(t, E.(eachcol(R * ū)) + E.(eachcol(e)); label = "E(ū) + E(u')")
-ylims!((0, ylims()[2]))
+plot!(t, E.(eachcol(R * ū)) + E.(eachcol(P * e)); label = "E(ū) + E(u')")
+# ylims!((0, ylims()[2]))
 pl
 
-savefig(loc * "kinetic_energy.pdf")
+# savefig(loc * "kinetic_energy.pdf")
 
 # Individual terms in dūdt
 markov = A * ū
@@ -139,8 +140,9 @@ memory = dūdt - markov - noise
 
 kernel = [norm(B * expmv(t[end] - t[i], D, C * W * u[i])) for i = 1:length(u)]
 
-plot(t, kernel; xlabel = "s", title = "Memory kernel", legend = false)
-savefig(loc * "kernel.pdf")
+plot(t, kernel; xlabel = "s", title = "Memory kernel, t = $(t[end])", legend = false)
+ylims!((0, ylims()[2]))
+# savefig(loc * "kernel.pdf")
 
 pl_Δ = plot(
     Δ,
@@ -152,25 +154,25 @@ pl_Δ = plot(
     xticks = [minimum(Δ), sum(extrema(Δ)) / 2, maximum(Δ)],
     # xlims = (0, maximum(Δ)),
 )
-pl_ū = plotsol(x, t, ū; title = "Filtered solution", ylabel = "")
-pl_markov = plotsol(x, t, markov; title = "Markovian term", ylabel = "")
-pl_noise = plotsol(x, t, noise; title = "Noise term", ylabel = "")
-pl_memory = plotsol(x, t, memory; title = "Memory term", ylabel = "")
+pl_ū = plotsol(x, t, ū; title = "Filtered solution")#, ylabel = "")
+pl_markov = plotsol(x, t, markov; title = "Markovian term")#, ylabel = "")
+pl_noise = plotsol(x, t, noise; title = "Noise term")#, ylabel = "")
+pl_memory = plotsol(x, t, memory; title = "Memory term")#, ylabel = "")
 
 plot(pl_Δ, pl_ū; layout = grid(1, 2, widths=[0.3 ,0.7]))
 savefig(loc * "filtered.png")
-savefig(article * "filtered.pdf")
+savefig(loc * "filtered.pdf")
 plot(pl_Δ, pl_markov; layout = grid(1, 2, widths=[0.3 ,0.7]))
 savefig(loc * "markov.png")
-savefig(article * "markov.pdf")
+savefig(loc * "markov.pdf")
 plot(pl_Δ, pl_noise; layout = grid(1, 2, widths=[0.3 ,0.7]))
 savefig(loc * "noise.png")
-savefig(article * "noise.pdf")
+savefig(loc * "noise.pdf")
 plot(pl_Δ, pl_memory; layout = grid(1, 2, widths=[0.3 ,0.7]))
 savefig(loc * "memory.png")
-savefig(article * "memory.pdf")
+savefig(loc * "memory.pdf")
 
-pl = plot(; xlabel = "t", title = "Term size (dū/dt)")
+pl = plot(; legend = :right, xlabel = "t", title = "Term size (dū/dt)")
 plot!(t, norm.(eachcol(markov)); label = "Markov")
 plot!(t, norm.(eachcol(noise)); label = "Noise")
 plot!(t, norm.(eachcol(memory)); label = "Memory")
@@ -326,10 +328,10 @@ n_valid = 10
 n_test = 60
 
 # Initial conditions (real-valued)
-u₀_train = create_data(ξ, K, n_train; decay)
-u₀_valid = create_data(ξ, K, n_valid; decay)
-u₀_test = create_data(ξ, K, n_test; decay)
-plot(ξ, u₀_train[:, 1:3]; xlabel = "x", title = "Initial conditions")
+u₀_train = create_data(y, K, n_train; decay)
+u₀_valid = create_data(y, K, n_valid; decay)
+u₀_test = create_data(y, K, n_test; decay)
+plot(y, u₀_train[:, 1:3]; xlabel = "x", title = "Initial conditions")
 
 # Evaluation times
 t_train = LinRange(0, 0.2, 41)
@@ -346,9 +348,9 @@ ū_train = apply_filter(W, u_train)
 ū_valid = apply_filter(W, u_valid)
 ū_test = apply_filter(W, u_test)
 
-plotsol(ξ, t_train, u_train[:, 1, :]; title = "u")
-plotsol(ξ, t_valid, u_valid[:, 1, :]; title = "u")
-plotsol(ξ, t_test, u_test[:, 1, :]; title = "u")
+plotsol(y, t_train, u_train[:, 1, :]; title = "u")
+plotsol(y, t_valid, u_valid[:, 1, :]; title = "u")
+plotsol(y, t_test, u_test[:, 1, :]; title = "u")
 
 plotsol(x, t_train, ū_train[:, 1, :]; title = "ū")
 plotsol(x, t_valid, ū_valid[:, 1, :]; title = "ū")

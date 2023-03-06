@@ -16,6 +16,7 @@ using Lux
 using Plots
 using Printf
 using SciMLSensitivity
+using SparseArrays
 
 # Domain length
 # l() = 8π
@@ -37,37 +38,48 @@ equation() = Burgers(l(), μ())
 # equation() = Schrodinger()
 
 # Fine discretization
-N = 400
-ξ = LinRange(0, l(), N + 1)[2:end]
-Δξ = l() / N
+N = 500
+y = LinRange(0, l(), N + 1)[2:end]
+Δy = l() / N
 
 # Coarse discretization
-M = 100
+M = 50
 x = LinRange(0, l(), M + 1)[2:end]
 Δx = l() / M
 
-# # Filter widths
-# ΔΔ(x) = 3Δx * (1 + 1 / 3 * sin(2π * x / l()))
-# Δ = ΔΔ.(x)
-# plot(x, Δ; xlabel = "x", title = "Filter width")
+# Filter widths
+ΔΔ(x) = 5 / 100 * l() * (1 + 1 / 3 * sin(2π * x / l()))
+Δ = ΔΔ.(x)
+plot(x, Δ; xlabel = "x", legend = false, title = "Filter width Δ(x)")
+# ylims!((0, ylims()[2]))
 
-# Filter width
-Δ = 5Δx
+savefig(loc * "filter_width.pdf")
+
+# # Filter width
+# Δ = 5Δx
 
 # Discrete filter matrix
-W = sum(gaussian.(Δ, x .- ξ' .- z .* l()) for z ∈ -2:2)
+W = sum(-1:1) do z
+    d = x .- y' .- z .* l()
+    gaussian.(Δ, d) .* (abs.(d) .≤ 3 ./ 2 .* Δ)
+    # top_hat.(Δ, d)
+end
 W = W ./ sum(W; dims = 2)
-plotmat(W; title = "Discrete filter")
+W = sparse(W)
+dropzeros!(W)
+plotmat(W; title = "W")
+
+savefig(loc * "W.pdf")
 
 ## Example solution
-u₀ = @. 1 + 0 * ξ
-u₀ = @. sin(2π * ξ / l()) + sin(2π * 3ξ / l()) + cos(2π * 5ξ / l())
-u₀ = @. sin(2π * ξ / l())
-u₀ = @. exp(-(ξ / l() - 0.5)^2 / 0.005)
-u₀ = @. 1.0 * (abs(ξ / l() - 0.5) ≤ 1 / 6)
+u₀ = @. 1 + 0 * y
+u₀ = @. sin(2π * y / l()) + sin(2π * 3y / l()) + cos(2π * 5y / l())
+u₀ = @. sin(2π * y / l())
+u₀ = @. exp(-(y / l() - 0.5)^2 / 0.005)
+u₀ = @. 1.0 * (abs(y / l() - 0.5) ≤ 1 / 6)
 plot(u₀; xlabel = "x")
 
-u₀ = complex(u₀)
+# u₀ = complex(u₀)
 
 # Plot example solution
 t = LinRange(0, 10 * tref(), 101)
@@ -75,19 +87,19 @@ sol = solve_equation(equation(), u₀, nothing, t; reltol = 1e-6, abstol = 1e-8)
 Wsol = W * sol
 for (i, t) ∈ enumerate(t)
     pl = plot(; xlabel = "x", title = @sprintf("t = %.2f", t), ylims = extrema(real.(sol[:, :])))
-    plot!(pl, ξ, real.(sol[i]); label = "Unfiltered")
+    plot!(pl, y, real.(sol[i]); label = "Unfiltered")
     plot!(pl, x, real.(Wsol[:, i]); label = "Filtered")
     display(pl)
-    sleep(0.05) # Time for plot pane to update
+    sleep(0.005) # Time for plot pane to update
 end
 
 # Momentum
-m = [Δξ * sum(u) for u ∈ sol.u]
+m = [Δy * sum(u) for u ∈ sol.u]
 m̄ = [Δx * sum(ū) for ū ∈ eachcol(Wsol)]
 plot(t, [m m̄]; xlabel = "t", title = "Momentum", label = ["Unfiltered" "Filtered"])
 
 # Energy
-E = [Δξ * u'u / 2 for u ∈ sol.u]
+E = [Δy * u'u / 2 for u ∈ sol.u]
 Ē = [Δx * ū'ū / 2 for ū ∈ eachcol(Wsol)]
 plot(t, [E Ē]; xlabel = "t", title = "Energy", label = ["Unfiltered" "Filtered"])
 
@@ -106,10 +118,10 @@ n_valid = 10
 n_test = 60
 
 # Initial conditions (real-valued)
-u₀_train = create_data(ξ, K, n_train; decay)
-u₀_valid = create_data(ξ, K, n_valid; decay)
-u₀_test = create_data(ξ, K, n_test; decay)
-plot(ξ, u₀_train[:, 1:3]; xlabel = "x", title = "Initial conditions")
+u₀_train = create_data(y, K, n_train; decay)
+u₀_valid = create_data(y, K, n_valid; decay)
+u₀_test = create_data(y, K, n_test; decay)
+plot(y, u₀_train[:, 1:3]; xlabel = "x", title = "Initial conditions")
 
 # Evaluation times
 t_train = LinRange(0, tref(), 41)
@@ -144,7 +156,7 @@ for (i, t) ∈ enumerate(t)
         title = @sprintf("Reference data, t = %.5f", t),
         ylims = extrema(u[:, iplot, :]),
     )
-    plot!(pl, ξ, u[:, iplot, i]; color = 1, label = "Unfiltered")
+    plot!(pl, y, u[:, iplot, i]; color = 1, label = "Unfiltered")
     plot!(pl, x, ū[:, iplot, i]; color = 2, label = "Filtered exact")
     display(pl)
     sleep(0.05)
@@ -194,7 +206,16 @@ p₀_simple, simple_closure = convolutional_closure(
     [identity],
 
     # Bias
-    [false],
+    [false];
+
+    # Input channels
+    channel_augmenter = u -> hcat(
+        # Vanilla channel
+        u,
+
+        # # Square channel to mimic non-linear term
+        # u .* u,
+    ),
 )
 
 # Initialize NN
@@ -248,7 +269,8 @@ p_simple_df = train(
         λ = 1e-8,
     ),
     p₀_simple,
-    10000;
+    # p_simple_df,
+    10_000;
     ncallback = 100,
     callback = create_callback(filtered_simple, ū_valid, t_valid),
 )
@@ -263,13 +285,13 @@ p_df = train(
         reshape(ū_train, M, :);
 
         # Number of random data samples for each loss evaluation (batch size)
-        nuse = 50,
+        nuse = 100,
 
         # Tikhonov regularization weight
         λ = 1e-8,
     ),
     p₀,
-    2500;
+    10_000;
     ncallback = 100,
     callback = create_callback(filtered, ū_valid, t_valid),
 )
@@ -277,6 +299,38 @@ p_df = train(
 # filename = "output/$(eqname(equation()))_df.jld2"
 # jldsave(filename; p_df)
 # p_df = load(filename, "p_df")
+
+p_simple_tf = train(
+    p -> trajectory_loss(
+        filtered_simple,
+        p,
+        ū_train,
+        t_train;
+
+        # Number of initial conditions per evaluation
+        nsolution = 5,
+
+        # Number of random time instances per evaluation
+        ntime = 20,
+
+        # Tikhonov regularization weight
+        λ = 1.0e-8,
+
+        # Tolerances
+        reltol = 1e-4,
+        abstol = 1e-6,
+
+        ## Sensitivity algorithm for computing gradient
+        # sensealg = BacksolveAdjoint(; autojacvec = ZygoteVJP()),
+        sensealg = InterpolatingAdjoint(; autojacvec = ZygoteVJP()),
+        # sensealg = QuadratureAdjoint(; autojacvec = ZygoteVJP()),
+    ),
+    # p₀_simple,
+    p_simple_df,
+    100;
+    ncallback = 10,
+    callback = create_callback(filtered_simple, ū_valid, t_valid),
+)
 
 p_tf = train(
     p -> trajectory_loss(
@@ -303,7 +357,8 @@ p_tf = train(
         sensealg = InterpolatingAdjoint(; autojacvec = ZygoteVJP()),
         # sensealg = QuadratureAdjoint(; autojacvec = ZygoteVJP()),
     ),
-    p₀,
+    # p₀,
+    p_df,
     100;
     ncallback = 10,
     callback = create_callback(filtered, ū_valid, t_valid),
@@ -314,10 +369,10 @@ p_tf = train(
 # p_tf = load(filename, "p_tf")
 
 # Example solution
-u₀ = @. sin(2π * ξ / l()) + sin(2π * 3ξ / l()) + cos(2π * 5ξ / l())
-u₀ = @. sin(2π * ξ / l())
-u₀ = @. exp(-(ξ / l() - 0.5)^2 / 0.005)
-u₀ = @. 1.0 * (abs(ξ / l() - 0.5) ≤ 1 / 6)
+u₀ = @. sin(2π * y / l()) + sin(2π * 3y / l()) + cos(2π * 5y / l())
+u₀ = @. sin(2π * y / l())
+u₀ = @. exp(-(y / l() - 0.5)^2 / 0.005)
+u₀ = @. 1.0 * (abs(y / l() - 0.5) ≤ 1 / 6)
 plot(u₀; xlabel = "x")
 
 t = LinRange(0, 10 * tref(), 101)
@@ -333,19 +388,19 @@ sol_nomodel = solve_equation(equation(), ū[:, 1], nothing, t; reltol = 1e-4, a
 sol_simple_df =
     solve_equation(filtered_simple, ū[:, 1], p_simple_df, t; reltol = 1e-4, abstol = 1e-6)
 sol_df = solve_equation(filtered, ū[:, 1], p_df, t; reltol = 1e-4, abstol = 1e-6)
-sol_tf = solve_equation(filtered, ū[:, 1], p_tf, t; reltol = 1e-4, abstol = 1e-6)
+# sol_tf = solve_equation(filtered, ū[:, 1], p_tf, t; reltol = 1e-4, abstol = 1e-6)
 for (i, t) ∈ enumerate(t)
     pl = plot(;
         xlabel = "x",
         title = @sprintf("Solutions, t = %.3f", t),
         ylims = extrema(ū),
     )
-    # plot!(pl, ξ, u[:, i]; linestyle = :dash, label = "Unfiltered")
+    # plot!(pl, y, u[:, i]; linestyle = :dash, label = "Unfiltered")
     plot!(pl, x, ū[:, i]; label = "Filtered exact")
     plot!(pl, x, sol_nomodel[i]; label = "No closure")
     plot!(pl, x, sol_simple_df[i]; label = "Derivative fit (simple)")
     plot!(pl, x, sol_df[i]; label = "Derivative fit")
-    plot!(pl, x, sol_tf[i]; label = "Trajectory fit")
+    # plot!(pl, x, sol_tf[i]; label = "Trajectory fit")
     display(pl)
     sleep(0.05)
 end
@@ -378,16 +433,16 @@ plot!(t, E_df; label = "Derivative fit")
 # plot!(t, E_tf; label = "Trajectory fit")
 pl
 
-plotsol(ξ, t, u[:, 1, :]; title = "u")
-savefig(loc * "burgers_u.png")
+plotsol(y, t, u[:, 1, :]; title = "u")
+# savefig(loc * "$(eqname(equation()))_u.png")
 plotsol(x, t, ū[:, 1, :], title = "Wu")
-savefig(loc * "burgers_Wu.png")
+# savefig(loc * "$(eqname(equation()))_Wu.png")
 plotsol(x, t, sol_df)
 # plotsol(x, t, sol_tf[:, 1, :])
 plotsol(x, t, sol_nomodel)
 plotsol(x, t, (sol_nomodel - ū) ./ norm(ū))
 plotsol(x, t, (sol_df - ū) ./ norm(ū))
-plotsol(x, t, (sol_tf - ū) ./ norm(ū))
+# plotsol(x, t, (sol_tf - ū) ./ norm(ū))
 
 relerr(Array(sol_nomodel), ū)
 relerr(Array(sol_simple_df), ū)
@@ -422,7 +477,7 @@ errerr(a, b) = error_total_momentum(a, b)
 errerr(a, b) = error_energy(a, b)
 errerr(a, b) = error_total_energy(a, b)
 
-pl = plot(; xlabel = "t", title = "Relative error", legend = :topright)
+pl = plot(; xlabel = "t", title = "Relative error (test dataset)", legend = :topright)
 plot!(t, errerr(v_nomodel, ū); label = "No model")
 plot!(t, errerr(v_simple_df, ū); label = "Linear closure")
 plot!(t, errerr(v_df, ū); label = "CNN closure")

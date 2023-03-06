@@ -56,7 +56,7 @@ function convolutional_closure(
 
     # Lux.setup(rng, NN)
     params, state = Lux.setup(rng, NN)
-    p, re = Lux.destructure(params)
+    p, re = destructure(params)
 
     """
         closure(u, p, t) 
@@ -125,7 +125,7 @@ function convolutional_matrix_closure(
 
     Lux.setup(rng, NN)
     params, state = Lux.setup(rng, NN)
-    p, re = Lux.destructure(params)
+    p, re = destructure(params)
 
     """
     Compute closure term for given parameters `p`.

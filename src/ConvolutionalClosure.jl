@@ -14,7 +14,7 @@ export Convection,
     Diffusion, Burgers, KortewegDeVries, KuramotoSivashinsky, Schrodinger, eqname
 export rk4
 export relerr, trajectory_loss, derivative_loss
-export plotsol, plotmat
+export plotsol, plotfield, plotmat
 export create_pod
 export create_data
 export solve_equation
