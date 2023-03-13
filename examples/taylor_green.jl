@@ -95,10 +95,10 @@ ay = reshape(-ry:ry, 1, 1, 1, :)
 ax = @. mod1(s * i + ax, N)
 ay = @. mod1(s * j + ay, N)
 
-z = repeat(reshape(kernel, 1, 1, 2rx+1, 2ry+1), M, M, 1, 1)
+z = repeat(reshape(kernel, 1, 1, 2rx + 1, 2ry + 1), M, M, 1, 1)
 
 α = @. i + M * (j - 1)
-α = repeat(α, 1, 1, 2rx+1, 2ry+1)
+α = repeat(α, 1, 1, 2rx + 1, 2ry + 1)
 β = @. ax + N * (ay - 1)
 
 W = sparse(α[:], β[:], z[:])
@@ -133,9 +133,7 @@ for ii = 1:100
     sleep(0.1)
 end
 
-gif(anim, loc * "animations/taylor_green_svd.gif"; fps = 10)
-
-
+# gif(anim, loc * "animations/taylor_green_svd.gif"; fps = 10)
 
 # ii = 452
 for ii = 1:50
@@ -159,23 +157,26 @@ i = [1:9; 100; 200; 400]
 mat = Ψ
 # mat = Ξ
 plot(
-    (plotfield(
-        xfine, yfine,
-        reshape(mat[:, i], N, N);
-        # label = i',
-        label = false,
-        xticks = iplot ≥ 9,
-        xlabel = iplot ∈ 9:12 ? "x" : "",
-        ylabel = iplot ∈ [1, 5, 9] ? "y" : "",
-        yticks = iplot ∈ [1, 5, 9],
-        # xlabel = "x",
-        title = i,
-        aspect_ratio = :equal,
-        xlims = (0, l()),
-        ylims = (0, l()),
-        # colorbar = iplot ∈ [4, 8, 12],
-        colorbar = false,
-    ) for (iplot, i) = enumerate(i))...,
+    (
+        plotfield(
+            xfine,
+            yfine,
+            reshape(mat[:, i], N, N);
+            # label = i',
+            label = false,
+            xticks = iplot ≥ 9,
+            xlabel = iplot ∈ 9:12 ? "x" : "",
+            ylabel = iplot ∈ [1, 5, 9] ? "y" : "",
+            yticks = iplot ∈ [1, 5, 9],
+            # xlabel = "x",
+            title = i,
+            aspect_ratio = :equal,
+            xlims = (0, l()),
+            ylims = (0, l()),
+            # colorbar = iplot ∈ [4, 8, 12],
+            colorbar = false,
+        ) for (iplot, i) in enumerate(i)
+    )...;
     clims = extrema(mat[:, i]),
     # layout = (2, 1),
     # title = "Eigenvectors of I/N - W'W/M",
@@ -200,8 +201,7 @@ V = [Vx;;; Vy]
 
 # Check that V is divergence free
 heatmap(
-    circshift(Vx, -1) - circshift(Vx, 1) + 
-    circshift(Vy, (0, -1)) - circshift(Vy, (0, 1))
+    circshift(Vx, -1) - circshift(Vx, 1) + circshift(Vy, (0, -1)) - circshift(Vy, (0, 1)),
 )
 
 plotfield(xfine, yfine, Vxfine)
@@ -222,20 +222,20 @@ function get_F1(Vx, Vy)
     ax = [circshift(b, -k) for k = -1:1]
     ay = [circshift(b, (0, -k)) for k = -1:1]
 
-    dx1  = (sign.(Vx) .≥ 0) .* ax[1] .+ (sign.(Vx) .< 0) .* ax[2]
-    dx2  = (sign.(Vx) .≥ 0) .* ax[2] .+ (sign.(Vx) .< 0) .* ax[3]
+    dx1 = (sign.(Vx) .≥ 0) .* ax[1] .+ (sign.(Vx) .< 0) .* ax[2]
+    dx2 = (sign.(Vx) .≥ 0) .* ax[2] .+ (sign.(Vx) .< 0) .* ax[3]
     dx = [dx1[:]; dx2[:]]
 
-    dy1  = (sign.(Vy) .≥ 0) .* ay[1] .+ (sign.(Vy) .< 0) .* ay[2]
-    dy2  = (sign.(Vy) .≥ 0) .* ay[2] .+ (sign.(Vy) .< 0) .* ay[3]
+    dy1 = (sign.(Vy) .≥ 0) .* ay[1] .+ (sign.(Vy) .< 0) .* ay[2]
+    dy2 = (sign.(Vy) .≥ 0) .* ay[2] .+ (sign.(Vy) .< 0) .* ay[3]
     dy = [dy1[:]; dy2[:]]
 
-    cx1  = @. -(sign(Vx) ≥ 0) - (sign(Vx) < 0)
-    cx2  = @. +(sign(Vx) ≥ 0) + (sign(Vx) < 0)
+    cx1 = @. -(sign(Vx) ≥ 0) - (sign(Vx) < 0)
+    cx2 = @. +(sign(Vx) ≥ 0) + (sign(Vx) < 0)
     cx = nx / l() * [cx1[:]; cx2[:]]
 
-    cy1  = @. -1 * (sign(Vy) ≥ 0) - 1 * (sign(Vy) < 0)
-    cy2  = @. +1 * (sign(Vy) ≥ 0) + 1 * (sign(Vy) < 0)
+    cy1 = @. -1 * (sign(Vy) ≥ 0) - 1 * (sign(Vy) < 0)
+    cy2 = @. +1 * (sign(Vy) ≥ 0) + 1 * (sign(Vy) < 0)
     cy = ny / l() * [cy1[:]; cy2[:]]
 
     Dx = sparse(dx, [b[:]; b[:]], cx, nx * ny, nx * ny)
@@ -254,24 +254,24 @@ function get_F2(Vx, Vy)
     ax = [circshift(b, -k) for k = -2:2]
     ay = [circshift(b, (0, -k)) for k = -2:2]
 
-    dx1  = (sign.(Vx) .≥ 0) .* ax[1] .+ (sign.(Vx) .< 0) .* ax[3]
-    dx2  = (sign.(Vx) .≥ 0) .* ax[2] .+ (sign.(Vx) .< 0) .* ax[4]
-    dx3  = (sign.(Vx) .≥ 0) .* ax[3] .+ (sign.(Vx) .< 0) .* ax[5]
+    dx1 = (sign.(Vx) .≥ 0) .* ax[1] .+ (sign.(Vx) .< 0) .* ax[3]
+    dx2 = (sign.(Vx) .≥ 0) .* ax[2] .+ (sign.(Vx) .< 0) .* ax[4]
+    dx3 = (sign.(Vx) .≥ 0) .* ax[3] .+ (sign.(Vx) .< 0) .* ax[5]
     dx = [dx1[:]; dx2[:]; dx3[:]]
 
-    dy1  = (sign.(Vy) .≥ 0) .* ay[1] .+ (sign.(Vy) .< 0) .* ay[3]
-    dy2  = (sign.(Vy) .≥ 0) .* ay[2] .+ (sign.(Vy) .< 0) .* ay[4]
-    dy3  = (sign.(Vy) .≥ 0) .* ay[3] .+ (sign.(Vy) .< 0) .* ay[5]
+    dy1 = (sign.(Vy) .≥ 0) .* ay[1] .+ (sign.(Vy) .< 0) .* ay[3]
+    dy2 = (sign.(Vy) .≥ 0) .* ay[2] .+ (sign.(Vy) .< 0) .* ay[4]
+    dy3 = (sign.(Vy) .≥ 0) .* ay[3] .+ (sign.(Vy) .< 0) .* ay[5]
     dy = [dy1[:]; dy2[:]; dy3[:]]
 
-    cx1  = @. +1/2 * (sign(Vx) ≥ 0) - 3/2 * (sign(Vx) < 0)
-    cx2  = @. -4/2 * (sign(Vx) ≥ 0) + 4/2 * (sign(Vx) < 0)
-    cx3  = @. +3/2 * (sign(Vx) ≥ 0) - 1/2 * (sign(Vx) < 0)
+    cx1 = @. +1 / 2 * (sign(Vx) ≥ 0) - 3 / 2 * (sign(Vx) < 0)
+    cx2 = @. -4 / 2 * (sign(Vx) ≥ 0) + 4 / 2 * (sign(Vx) < 0)
+    cx3 = @. +3 / 2 * (sign(Vx) ≥ 0) - 1 / 2 * (sign(Vx) < 0)
     cx = nx / l() * [cx1[:]; cx2[:]; cx3[:]]
 
-    cy1  = @. +1/2 * (sign(Vy) ≥ 0) - 3/2 * (sign(Vy) < 0)
-    cy2  = @. -4/2 * (sign(Vy) ≥ 0) + 4/2 * (sign(Vy) < 0)
-    cy3  = @. +3/2 * (sign(Vy) ≥ 0) - 1/2 * (sign(Vy) < 0)
+    cy1 = @. +1 / 2 * (sign(Vy) ≥ 0) - 3 / 2 * (sign(Vy) < 0)
+    cy2 = @. -4 / 2 * (sign(Vy) ≥ 0) + 4 / 2 * (sign(Vy) < 0)
+    cy3 = @. +3 / 2 * (sign(Vy) ≥ 0) - 1 / 2 * (sign(Vy) < 0)
     cy = ny / l() * [cy1[:]; cy2[:]; cy3[:]]
 
     Dx = sparse(dx, [b[:]; b[:]; b[:]], cx, nx * ny, nx * ny)
@@ -288,15 +288,18 @@ plotmat(Ffine[1:100, 1:100])
 plotmat(F[1:20, 1:20])
 
 icfunc(x, y) = exp(-((x - l() / 3)^2 + (y - l() / 4)^2) * 100 / l()^2)
-icfunc(x, y) = abs(x - 0.3) < 0.1 && abs(y - 0.4) < 0.1 
+icfunc(x, y) = abs(x - 0.3) < 0.1 && abs(y - 0.4) < 0.1
 
 nfreq = 10
 c = [randn() ./ sqrt(kx^2 + ky^2) for kx = 1:nfreq+1, ky = 1:nfreq+1]
-ϕx = 2π * rand(nfreq+1)
-ϕy = 2π * rand(nfreq+1)
-icfunc(x, y) = sum(c[i,j] * cos(2π * (i - 1) * x - ϕx[i]) * cos(2π * (j - 1) * y - ϕy[j]) for i = 1:nfreq+1, j = 1:nfreq+1)
+ϕx = 2π * rand(nfreq + 1)
+ϕy = 2π * rand(nfreq + 1)
+icfunc(x, y) = sum(
+    c[i, j] * cos(2π * (i - 1) * x - ϕx[i]) * cos(2π * (j - 1) * y - ϕy[j]) for
+    i = 1:nfreq+1, j = 1:nfreq+1
+)
 
-icfunc(0.2,0.3)
+icfunc(0.2, 0.3)
 
 u₀fine = icfunc.(xfine, yfine')
 u₀ = icfunc.(x, y')
@@ -315,7 +318,7 @@ du₀ = reshape(F * u₀[:], M, M)
 plotfield(xfine, yfine, du₀fine)
 plotfield(x, y, du₀)
 
-t = LinRange(0, 2.0, 101)
+t = LinRange(0, 5.0, 101)
 # ufine = solve_equation(f, u₀fine, Vfine, t; reltol = 1e-3, abstol = 1e-6)
 # u = solve_equation(f, u₀, V, t; reltol = 1e-3, abstol = 1e-6)
 ufine = solve_matrix(Ffine, u₀fine[:], t; reltol = 1e-4, abstol = 1e-8)
@@ -324,13 +327,13 @@ u = solve_matrix(F, u₀[:], t; reltol = 1e-3, abstol = 1e-6)
 # anim = @animate for (i, t) ∈ enumerate(t)
 for (i, t) ∈ enumerate(t)
     pl = plotfield(
-        # xfine,
-        # yfine,
-        # reshape(ufine[i], N, N);
-        x,
-        y,
+        xfine,
+        yfine,
+        reshape(ufine[i], N, N);
+        # x,
+        # y,
         # reshape(W * ufine[i], M, M);
-        reshape(u[i], M, M);
+        # reshape(u[i], M, M);
         title = @sprintf("Solution, t = %.2f", t),
         xlabel = "x",
         ylabel = "y",
@@ -340,7 +343,7 @@ for (i, t) ∈ enumerate(t)
     sleep(0.005) # Time for plot pane to update
 end
 
-gif(anim, loc * "animations/taylor_green_u.gif")
+# gif(anim, loc * "animations/taylor_green_u.gif")
 
 E(u) = 1 / 2 * sum(abs2, u) * l()^2 / prod(size(u))
 

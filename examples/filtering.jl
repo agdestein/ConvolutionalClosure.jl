@@ -86,7 +86,11 @@ t = LinRange(0, 10 * tref(), 101)
 sol = solve_equation(equation(), u₀, nothing, t; reltol = 1e-6, abstol = 1e-8)
 Wsol = W * sol
 for (i, t) ∈ enumerate(t)
-    pl = plot(; xlabel = "x", title = @sprintf("t = %.2f", t), ylims = extrema(real.(sol[:, :])))
+    pl = plot(;
+        xlabel = "x",
+        title = @sprintf("t = %.2f", t),
+        ylims = extrema(real.(sol[:, :])),
+    )
     plot!(pl, y, real.(sol[i]); label = "Unfiltered")
     plot!(pl, x, real.(Wsol[:, i]); label = "Filtered")
     display(pl)
@@ -435,7 +439,7 @@ pl
 
 plotsol(y, t, u[:, 1, :]; title = "u")
 # savefig(loc * "$(eqname(equation()))_u.png")
-plotsol(x, t, ū[:, 1, :], title = "Wu")
+plotsol(x, t, ū[:, 1, :]; title = "Wu")
 # savefig(loc * "$(eqname(equation()))_Wu.png")
 plotsol(x, t, sol_df)
 # plotsol(x, t, sol_tf[:, 1, :])

@@ -33,8 +33,8 @@ for (i, t) ∈ enumerate(t)
     plot!(pl, x, sol_NN[:, 1, i]; label = "Neural closure")
     plot!(pl, x, sol_A[:, 1, i]; label = "Fit matrix")
     span = x -> [x - ΔΔ(x) / 2, x + ΔΔ(x) / 2]
-    vspan!(pl, span(1 / 4); fillalpha = 0.1, color = 1, label = L"x \pm h(x)");
-    vspan!(pl, span(3 / 4); fillalpha = 0.1, color = 1, label = nothing);
+    vspan!(pl, span(1 / 4); fillalpha = 0.1, color = 1, label = L"x \pm h(x)")
+    vspan!(pl, span(3 / 4); fillalpha = 0.1, color = 1, label = nothing)
     display(pl)
     sleep(0.05)
 end
@@ -46,13 +46,15 @@ heatmap(t_test, x, sol_NN[:, 1, :]; xlabel = "t", ylabel = "x", clims = lims)
 heatmap(t_test, x, sol_A[:, 1, :]; xlabel = "t", ylabel = "x", clims = lims)
 heatmap(t_test, x, sol[:, 1, :]; xlabel = "t", ylabel = "x", clims = lims)
 heatmap(
-    t_test, x,
+    t_test,
+    x,
     (sol_NN[:, 1, :] - ū[:, isample, :]) ./ norm(ū[:, isample, :]);
     xlabel = "t",
     ylabel = "x",
 )
 heatmap(
-    t_test, x,
+    t_test,
+    x,
     (sol_A[:, 1, :] - ū[:, isample, :]) ./ norm(ū[:, isample, :]);
     xlabel = "t",
     ylabel = "x",

@@ -78,10 +78,19 @@ tref()
 10 * tref()
 
 # FOM solutions
-u_train_pod = solve_equation(equation(), u₀_train_pod, nothing, t_train_pod; reltol = 1e-4, abstol = 1e-6)
-u_train     = solve_equation(equation(), u₀_train,     nothing, t_train; reltol = 1e-4, abstol = 1e-6)
-u_valid     = solve_equation(equation(), u₀_valid,     nothing, t_valid; reltol = 1e-4, abstol = 1e-6)
-u_test      = solve_equation(equation(), u₀_test,      nothing, t_test; reltol = 1e-4, abstol = 1e-6)
+u_train_pod = solve_equation(
+    equation(),
+    u₀_train_pod,
+    nothing,
+    t_train_pod;
+    reltol = 1e-4,
+    abstol = 1e-6,
+)
+u_train =
+    solve_equation(equation(), u₀_train, nothing, t_train; reltol = 1e-4, abstol = 1e-6)
+u_valid =
+    solve_equation(equation(), u₀_valid, nothing, t_valid; reltol = 1e-4, abstol = 1e-6)
+u_test = solve_equation(equation(), u₀_test, nothing, t_test; reltol = 1e-4, abstol = 1e-6)
 
 # Number of POD modes
 M = 30
@@ -112,7 +121,11 @@ t = LinRange(0, 50 * tref(), 101)
 sol_fom = solve_equation(equation(), u₀, nothing, t; reltol = 1e-6, abstol = 1e-8)
 sol_rom = solve_equation(rom, Φ' * u₀, nothing, t; reltol = 1e-6, abstol = 1e-8)
 for (i, t) ∈ enumerate(t)
-    pl = plot(; xlabel = "x", title = @sprintf("t = %.2f", t), ylims = extrema(sol_fom[:, :]))
+    pl = plot(;
+        xlabel = "x",
+        title = @sprintf("t = %.2f", t),
+        ylims = extrema(sol_fom[:, :]),
+    )
     plot!(pl, ξ, sol_fom[i]; label = "FOM")
     plot!(pl, ξ, Φ * sol_rom[i]; label = "ROM")
     display(pl)
@@ -250,10 +263,7 @@ plot_loss = let
         println("Iteration $i \t average relative error $err")
         push!(hist_i, ifirst + i)
         push!(hist_err, err)
-        pl = plot(;
-            title = "Average relative error",
-            xlabel = "Iterations",
-        )
+        pl = plot(; title = "Average relative error", xlabel = "Iterations")
         hline!(pl, [err_nomodel]; color = 1, linestyle = :dash, label = "No closure")
         plot!(pl, hist_i, hist_err; label = "With closure")
         display(pl)

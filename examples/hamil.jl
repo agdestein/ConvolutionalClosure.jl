@@ -54,7 +54,7 @@ n = 10_000
 umean = sum(x -> s(f!, x, t), [xbar; xprime(xbar)] for _ = 1:n) / n
 
 fig, ax, = lines(t, umean[1, :]; label = "u₁", axis = (; xlabel = "t", ylabel = "E[u]"))
-lines!(ax, t, umean[2, :], label = "u₂")
+lines!(ax, t, umean[2, :]; label = "u₂")
 axislegend()
 
 save(loc * "truemean.pdf", current_figure())
@@ -69,7 +69,8 @@ u1 = s(f1, xbar, t)
 ut = s(ft, xbar, t)
 ur = s(fr, xbar, t)
 
-fig, ax, = lines(t, umean[1, :]; label = "True mean", axis = (; xlabel = "t", ylabel = "E[u₁]"))
+fig, ax, =
+    lines(t, umean[1, :]; label = "True mean", axis = (; xlabel = "t", ylabel = "E[u₁]"))
 lines!(ax, t, u1[1, :]; label = "R̄ ")
 lines!(ax, t, ut[1, :]; label = "R̄ + t-model")
 lines!(ax, t, ur[1, :]; label = "Galerkin")
@@ -93,5 +94,3 @@ dudx * R(x)
 R(u)
 
 dudx * R(x) - R(u)
-
-

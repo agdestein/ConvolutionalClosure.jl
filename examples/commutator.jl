@@ -46,8 +46,8 @@ plotmat(W * DN * P)
 plotmat(DM)
 
 pl = plot()
-bar!((W * DN)[6, :]; label = "W D")
-bar!((DM * W)[6, :]; label = "D W")
+bar!((W*DN)[6, :]; label = "W D")
+bar!((DM*W)[6, :]; label = "D W")
 pl
 
 bar(C[6, :])

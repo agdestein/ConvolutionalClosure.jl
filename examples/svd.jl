@@ -82,14 +82,16 @@ i = [1:7; 10; 20; 30; 40; 50]
 indind = k -> 1:k
 # indind = k -> k:k
 plot(
-    (plotmat(
-        Φ[:, indind(k)] * Diagonal(σ[indind(k)]) * Ψ[:, indind(k)]';
-        xticks = iplot ≤ 4,
-        yticks = iplot ∈ [1, 5, 9],
-        # xlabel = "x",
-        colorbar = false,
-        title = k,
-    ) for (iplot, k) = enumerate(i))...,
+    (
+        plotmat(
+            Φ[:, indind(k)] * Diagonal(σ[indind(k)]) * Ψ[:, indind(k)]';
+            xticks = iplot ≤ 4,
+            yticks = iplot ∈ [1, 5, 9],
+            # xlabel = "x",
+            colorbar = false,
+            title = k,
+        ) for (iplot, k) in enumerate(i)
+    )...;
     # layout = (2, 1),
     # title = "Eigenvectors of I/N - W'W/M",
     # size = (1200, 800),
@@ -105,8 +107,10 @@ plotmat(P)
 plotmat(P * V)
 plotmat(Ψ)
 
-i =  20; plot(y, Ψ[:, i]; title = "Right singular vectors $i", xlabel = "x")
-i = 316; plot(y, P[:, i]; title = "Right singular vectors $i", xlabel = "x")
+i = 20;
+plot(y, Ψ[:, i]; title = "Right singular vectors $i", xlabel = "x");
+i = 316;
+plot(y, P[:, i]; title = "Right singular vectors $i", xlabel = "x");
 
 for i = 1:M
     display(plot(y, Ψ[:, i]; title = "Right singular vectors $i", xlabel = "x"))
@@ -121,17 +125,19 @@ end
 
 i = [1:7; 10; 20; 30; 40; 50]
 plot(
-    (plot(
-        y,
-        Ψ[:, i];
-        # label = i',
-        label = false,
-        xticks = iplot ≥ 9,
-        xlabel = iplot ≥ 9 ? "x" : "",
-        yticks = false,
-        # xlabel = "x",
-        title = i,
-    ) for (iplot, i) = enumerate(i))...,
+    (
+        plot(
+            y,
+            Ψ[:, i];
+            # label = i',
+            label = false,
+            xticks = iplot ≥ 9,
+            xlabel = iplot ≥ 9 ? "x" : "",
+            yticks = false,
+            # xlabel = "x",
+            title = i,
+        ) for (iplot, i) in enumerate(i)
+    )...;
     # layout = (2, 1),
     # title = "Eigenvectors of I/N - W'W/M",
     # size = (1200, 800),
@@ -142,16 +148,18 @@ plot(
 
 i = [1, 50, 100, 150, 200, 250]
 plot(
-    (plot(
-        y,
-        Ξ[:, i];
-        label = false,
-        xticks = iplot ≥ 4,
-        xlabel = iplot ≥ 4 ? "x" : "",
-        yticks = false,
-        # xlabel = "x",
-        title = "k = $i",
-    ) for (iplot, i) = enumerate(i))...,
+    (
+        plot(
+            y,
+            Ξ[:, i];
+            label = false,
+            xticks = iplot ≥ 4,
+            xlabel = iplot ≥ 4 ? "x" : "",
+            yticks = false,
+            # xlabel = "x",
+            title = "k = $i",
+        ) for (iplot, i) in enumerate(i)
+    )...;
     # layout = (2, 1),
     # title = "Eigenvectors of I/N - W'W/M",
     # size = (1200, 800),
@@ -181,8 +189,8 @@ for k = 1:M
     pl = plot(; xlabel = "x", title = "Signal")
     plot!(y, u; label = "u")
     # plot!(y, R * W * u;  label = "RWu")
-    plot!(y, Ψ[:, i] * Ψ[:, i]' * u;  label = "ΨiΨi'u")
-    plot!(y, P * V * u;  label = "PVu")
+    plot!(y, Ψ[:, i] * Ψ[:, i]' * u; label = "ΨiΨi'u")
+    plot!(y, P * V * u; label = "PVu")
     display(pl)
     sleep(0.1)
 end
@@ -191,8 +199,8 @@ ke(u) = u^2 / 2
 
 plot(; xlabel = "x", title = "Kinetic energy")
 plot!(y, ke.(u); label = "u")
-plot!(y, ke.(R * W * u);  label = "RWu")
-plot!(y, ke.(P * V * u);  label = "PVu")
+plot!(y, ke.(R * W * u); label = "RWu")
+plot!(y, ke.(P * V * u); label = "PVu")
 # plot!(x, ke.(W * u);  label = "Wu")
 
 sum(ke.(W * u)) / M
@@ -214,7 +222,7 @@ e[100] = 1
 plot(; xlabel = "x", title = "Signal")
 plot!(y, e; label = "e")
 # plot!(x, W * e;  label = "RWe")
-plot!(y, R * W * e;  label = "RWe")
+plot!(y, R * W * e; label = "RWe")
 # plot!(y, e - R * W * e; label = "RWe")
 
 
@@ -246,7 +254,7 @@ sticks(y, W[10, :]; xlims = (0, 1))
 sticks(x, W[:, 100]; xlims = (0, 1))
 
 m = 40
-sticks(x, R[s * m, :]; xlims = (0, 1))
+sticks(x, R[s*m, :]; xlims = (0, 1))
 plot(y, R[:, m]; xlims = (0, 1))
 
 for m = 1:M

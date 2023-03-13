@@ -166,16 +166,18 @@ plot(
 plot!(y, 0.4ΔΔ.(y) .- 0.085)
 
 plot(
-    (plot(
-        y,
-        vecs[:, i];
-        # label = i',
-        label = false,
-        xticks = false,
-        yticks = false,
-        # xlabel = "x",
-        title = i,
-    ) for i = [1:7; 49; 50; 51; 52; 500])...,
+    (
+        plot(
+            y,
+            vecs[:, i];
+            # label = i',
+            label = false,
+            xticks = false,
+            yticks = false,
+            # xlabel = "x",
+            title = i,
+        ) for i in [1:7; 49; 50; 51; 52; 500]
+    )...;
     # layout = (2, 1),
     # title = "Eigenvectors of I/N - W'W/M",
     # size = (1200, 800),
@@ -320,7 +322,7 @@ decomp = svd(Matrix(W))
 UU, SS, VV = decomp
 
 plotmat(R)
-plotmat(VV*Diagonal(1 ./ SS) * UU')
+plotmat(VV * Diagonal(1 ./ SS) * UU')
 
 plotmat(R * W)
 
@@ -354,11 +356,11 @@ plotmat(dec.U)
 scatter(dec.S)
 plot(y, dec.V[:, 34])
 
-plotmat(W' * UU * Diagonal(1 ./ SS.^2) * UU')
+plotmat(W' * UU * Diagonal(1 ./ SS .^ 2) * UU')
 
 scatter(decomp.S)
 scatter(vals)
-scatter!(1 .- decomp.S.^2 .* 10)
+scatter!(1 .- decomp.S .^ 2 .* 10)
 
 r = 50
 TT = vecs[:, 1:r] * Diagonal(vals[1:r]) * vecs[:, 1:r]'

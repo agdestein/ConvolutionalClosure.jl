@@ -94,7 +94,7 @@ plotmat(A)
 plotmat(Matrix(B * B'))
 plotmat(inv(Matrix(B * B')))
 
-X = [A I; B * C B * D * B' / Matrix(B * B')]
+X = [A I; B*C B*D*B'/Matrix(B * B')]
 plotmat(log.(abs.(X)))
 
 """

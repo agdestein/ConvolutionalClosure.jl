@@ -236,10 +236,10 @@ w_valid = reshape(T(reshape(Array(u_valid), N, :), τ), M, n_valid, :)
 w_test = reshape(T(reshape(Array(u_test), N, :), τ), M, n_test, :)
 
 # Augmented states
-q       = [ū       ; w      ]
-q_train = [ū_train ; w_train]
-q_valid = [ū_valid ; w_valid]
-q_test  = [ū_test  ; w_test ]
+q = [ū; w]
+q_train = [ū_train; w_train]
+q_valid = [ū_valid; w_valid]
+q_test = [ū_test; w_test]
 
 # Time derivatives
 dudt = apply_filter(FN, u)
@@ -260,10 +260,10 @@ dwdt_valid = reshape(T(reshape(Array(dudt_valid), N, :), τ), M, n_valid, :)
 dwdt_test = reshape(T(reshape(Array(dudt_test), N, :), τ), M, n_test, :)
 
 # Augmented time derivatives
-dqdt       = [dūdt       ; dwdt      ]
-dqdt_train = [dūdt_train ; dwdt_train]
-dqdt_valid = [dūdt_valid ; dwdt_valid]
-dqdt_test  = [dūdt_test  ; dwdt_test ]
+dqdt = [dūdt; dwdt]
+dqdt_train = [dūdt_train; dwdt_train]
+dqdt_valid = [dūdt_valid; dwdt_valid]
+dqdt_test = [dūdt_test; dwdt_test]
 
 plot(; xlabel = "t")
 plot!(t, E.(eachcol(u)); label = "E(u)")
@@ -303,18 +303,8 @@ function create_callback(Q, q, t; iplot = 1:10)
     # w = q[M+1:end, iplot, :]
     hist_i = Int[]
     hist_err = zeros(0)
-    err_nomodel = relerr(
-        Array(
-            solve_matrix(
-                FM,
-                ū[:, :, 1],
-                t;
-                reltol = 1e-4,
-                abstol = 1e-6,
-            ),
-        ),
-        ū,
-    )
+    err_nomodel =
+        relerr(Array(solve_matrix(FM, ū[:, :, 1], t; reltol = 1e-4, abstol = 1e-6)), ū)
     function callback(i, p)
         sol = solve_equation(Q, q[:, iplot, 1], p, t; reltol = 1e-4, abstol = 1e-6)
         v = sol[1:M, :, :]
@@ -354,7 +344,7 @@ first(
             λ = 1e-8,
         ),
         p₀,
-    )
+    ),
 )
 
 create_callback(Q, q_valid, t_valid)

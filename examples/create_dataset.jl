@@ -5,20 +5,20 @@ using OrdinaryDiffEq
 
 Args:
 
-- Right hand side `f(u, p, t)`
-- Maximum frequency in initial conditions `K`
-- Spatial points `x = LinRange(0, L, N + 1)[2:end]`
-- Number of different initial conditions `nsolution`
-- Time points to save `t = LinRange(0, T, ntime)`
+  - Right hand side `f(u, p, t)`
+  - Maximum frequency in initial conditions `K`
+  - Spatial points `x = LinRange(0, L, N + 1)[2:end]`
+  - Number of different initial conditions `nsolution`
+  - Time points to save `t = LinRange(0, T, ntime)`
 
 Kwargs:
 
-- Frequency decay function (for initial conditions) `decay(k)`
-- Other kwargs: Pass to ODE solver (e.g. `reltol = 1e-4`, `abstol = 1e-6`)
+  - Frequency decay function (for initial conditions) `decay(k)`
+  - Other kwargs: Pass to ODE solver (e.g. `reltol = 1e-4`, `abstol = 1e-6`)
 
 Returns:
 
-- Solution `u` of size `(nx, nsolution, ntime)`
+  - Solution `u` of size `(nx, nsolution, ntime)`
 
 To get initial conditions, do `u₀ = u[:, :, 1]`.
 """
@@ -60,4 +60,4 @@ t_test = LinRange(0.0, 1.0, 30)
 K = 100
 
 u_train = create_data(burgers, K, x, 500, t_train; reltol = 1e-4, abstol = 1e-6)
-u_test  = create_data(burgers, K, x, 50, t_test; reltol = 1e-4, abstol = 1e-6)
+u_test = create_data(burgers, K, x, 50, t_test; reltol = 1e-4, abstol = 1e-6)
