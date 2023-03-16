@@ -7,7 +7,7 @@ end                                                 #src
 
 # # Taylor-Green convection
 #
-# Convect a quantity ``u`` using the Taylor-Green velocity field
+# Convect a quantity `u` using the Taylor-Green velocity field
 
 using ConvolutionalClosure
 using LinearAlgebra
@@ -66,8 +66,6 @@ plot(gaussian.(Δx, (-rx:rx) ./ N))
 
 plot(gaussian.(Δy, (-ry:ry) ./ N))
 
-M^2 * length(-rx:rx) * length(-ry:ry)
-
 kx = gaussian.(Δx, (-rx:rx) ./ N)
 ky = gaussian.(Δy, (-ry:ry) ./ N)
 
@@ -89,18 +87,14 @@ heatmap(
 
 i = 1:M
 j = reshape(1:M, 1, M)
-
 ax = reshape(-rx:rx, 1, 1, :)
 ay = reshape(-ry:ry, 1, 1, 1, :)
 ax = @. mod1(s * i + ax, N)
 ay = @. mod1(s * j + ay, N)
-
 z = repeat(reshape(kernel, 1, 1, 2rx + 1, 2ry + 1), M, M, 1, 1)
-
 α = @. i + M * (j - 1)
 α = repeat(α, 1, 1, 2rx + 1, 2ry + 1)
 β = @. ax + N * (ay - 1)
-
 W = sparse(α[:], β[:], z[:])
 
 size(W)
@@ -286,6 +280,7 @@ F = get_F2(Vx, Vy)
 
 plotmat(Ffine[1:100, 1:100])
 plotmat(F[1:20, 1:20])
+plotmat(F)
 
 icfunc(x, y) = exp(-((x - l() / 3)^2 + (y - l() / 4)^2) * 100 / l()^2)
 icfunc(x, y) = abs(x - 0.3) < 0.1 && abs(y - 0.4) < 0.1
@@ -305,11 +300,10 @@ u₀fine = icfunc.(xfine, yfine')
 u₀ = icfunc.(x, y')
 
 plotfield(xfine, yfine, u₀fine)
-surface(xfine, yfine, u₀fine)
-
+plotfield(x, y, u₀)
 plotfield(x, y, reshape(W * u₀fine[:], M, M))
 
-plotfield(x, y, u₀)
+surface(xfine, yfine, u₀fine)
 surface(x, y, u₀)
 
 du₀fine = reshape(Ffine * u₀fine[:], N, N)
@@ -318,9 +312,7 @@ du₀ = reshape(F * u₀[:], M, M)
 plotfield(xfine, yfine, du₀fine)
 plotfield(x, y, du₀)
 
-t = LinRange(0, 5.0, 101)
-# ufine = solve_equation(f, u₀fine, Vfine, t; reltol = 1e-3, abstol = 1e-6)
-# u = solve_equation(f, u₀, V, t; reltol = 1e-3, abstol = 1e-6)
+t = LinRange(0, 2.0, 101)
 ufine = solve_matrix(Ffine, u₀fine[:], t; reltol = 1e-4, abstol = 1e-8)
 u = solve_matrix(F, u₀[:], t; reltol = 1e-3, abstol = 1e-6)
 
