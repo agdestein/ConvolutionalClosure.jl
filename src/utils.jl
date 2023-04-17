@@ -142,3 +142,6 @@ function apply_stencils_nonsquare(u, p)
     Tu = Tu[s:s:end, :]
     reshape(Tu, M, ssupp...)
 end
+
+relu(x) = max(0, x)
+gelu(x) = x / 2 * (1 + erf(x / sqrt(2)))

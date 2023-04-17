@@ -46,4 +46,7 @@ plotmat(A; kwargs...) = heatmap(
     kwargs...,
 )
 
+
+# heatmap(reverse(A'); dims = 2))
+
 plotmat(A::AbstractSparseMatrix; kwargs...) = plotmat(Matrix(A); kwargs...)

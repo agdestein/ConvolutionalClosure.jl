@@ -1,4 +1,26 @@
 """
+    solve_equation(f, u₀, p, t; kwargs...)
+
+Solve equation from `t[1]` to `t[end]`.
+The ODE right hand side `f` should work on one vector with size `(N, 1)` and with multiple vectors in parallel in in a matrix of size `(N, nvector)`.
+The initial conditions `u₀` are of size `N × n_IC`.
+The solution is saved at `t` of size `n_t`.
+
+Return an `ODESolution` acting as an array of size `N × n_IC × n_t`.
+"""
+function solve_equation(f, u₀, p, t; kwargs...)
+    problem = ODEProblem(f, u₀, extrema(t), p)
+    solve(problem, Tsit5(); saveat = t, kwargs...)
+end
+
+apply_mat(u, p, t) = p * u
+function solve_matrix(A, u₀, t, solver = Tsit5(); kwargs...)
+    problem = ODEProblem(apply_mat, u₀, extrema(t), A)
+    # problem = ODEProblem(DiffEqArrayOperator(A), u₀, extrema(t))
+    solve(problem, solver; saveat = t, kwargs...)
+end
+
+"""
     rk4(f, p, u₀, t, Δt)
 
 Solve ODE ``du/dt = f(u, p, t)`` with RK4, where ``p`` are parameters.

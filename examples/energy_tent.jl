@@ -25,18 +25,14 @@ using Zygote
 
 Random.seed!(123)
 
-apply_mat(u, p, t) = p * u
-function solve_matrix(A, u₀, t, solver = Tsit5(); kwargs...)
-    problem = ODEProblem(apply_mat, u₀, extrema(t), A)
-    # problem = ODEProblem(DiffEqArrayOperator(A), u₀, extrema(t))
-    solve(problem, solver; saveat = t, kwargs...)
-end
-
 l() = 1.0
 
-s = 10
+r = 2
+s = 2 * r + 1
 M = 50
 N = s * M
+
+T = sparse(circshift(kron(I(M), fill(1 / sqrt(s), 1, s)), (0, r)))
 
 loc = "output/energy/N$(N)_M$(M)/"
 mkpath(loc)
@@ -106,32 +102,18 @@ kmax = 2M
 # kmax = N ÷ 2
 
 # Number of samples
-n_compress = 5000
 n_train = 120
 n_valid = 10
 n_test = 60
 
 # Initial conditions (real-valued)
 u₀ = create_data(y, kmax, 1; decay)[:]
-u₀_compress = create_data(y, kmax, n_compress; decay)
 u₀_train = create_data(y, kmax, n_train; decay)
 u₀_valid = create_data(y, kmax, n_valid; decay)
 u₀_test = create_data(y, kmax, n_test; decay)
 plot(y, u₀_train[:, 1:3]; xlabel = "x", label = ["u₁" "u₂" "u₃"], title = "Data samples")
 
 # savefig(loc * "data_samples.pdf")
-
-#   a b c d e
-# 1 1 1 1 1 1 1 1 1 1 1 1
-#       1       1       1
-#
-#           a b c d e
-# 1 1 1 1 1 1 1 1 1 1 1 1
-#       1       1       1
-#
-# d e               a b c
-# 1 1 1 1 1 1 1 1 1 1 1 1
-#       1       1       1
 
 plot(; xlabel = "x", title = "Local filter kernels")
 sticks!(y, W[10, :]; label = @sprintf "x = %.2f" x[10])
@@ -140,54 +122,24 @@ sticks!(y, W[30, :]; label = @sprintf "x = %.2f" x[30])
 sticks!(y, W[40, :]; label = @sprintf "x = %.2f" x[40])
 sticks!(y, W[50, :]; label = @sprintf "x = %.2f" x[50])
 
-maximum(i -> length(W[i, :].nzval), 1:M)
+plot(y, u₀)
+plot!(y, R * W * u₀)
+plot!(y, (I - R * W) * u₀)
+plot!(y, T' * T * (I - R * W) * u₀)
 
-T = apply_stencils_nonsquare
-
-function loss_comp(p, u)
-    v = W * u
-    w = T(u, p)
-    Ev = v .* v
-    Ew = w .* w
-    Eu = u .* u
-    sum(abs2, sum(Ev; dims = 1) ./ M + sum(Ew; dims = 1) ./ M - sum(Eu; dims = 1) ./ N) /
-    size(u, 2)
-    # sum(abs2, eachcol(Ev + Ew - Eu)) / size(u, 2)
-end
-
-function loss_comp(p; u = u₀_compress, nuse = 100)
-    nsample = size(u, 2)
-    i = Zygote.@ignore sort(shuffle(1:nsample)[1:nuse])
-    loss_comp(p, u[:, i])
-end
+plot(y, u₀ .^ 2)
+plot!(y, (R * W * u₀) .^ 2)
+# plot!(y, ((I - R * W) * u₀).^2)
+plot!(y, (R * W * u₀) .^ 2 .+ ((I - R * W) * u₀) .^ 2)
 
 E(u) = u'u / 2 * l() / length(u)
 
-d = 21
-# τ₀ = fill(1 / d, M, d)
-# τ₀ = zeros(M, d)
-τ₀ = 0.01 * randn(M, d)
-
-τ = τ₀
-loss_comp(τ₀; u = u₀_compress[:, 1:100], nuse = 100)
-loss_comp(τ; u = u₀_compress[:, 1:100], nuse = 100)
-first(gradient(loss_comp, τ))
-
-τ = train(
-    loss_comp,
-    τ₀,
-    # p,
-    5000;
-    opt = Optimisers.ADAM(0.001),
-    callback = (i, τ) -> println(
-        "Iteration \t $i, loss: $(loss_comp(τ; u = u₀_compress[:, 1:100], nuse = 100))",
-    ),
-    ncallback = 10,
-)
-
 v₀ = W * u₀
-w₀ = T(u₀, τ)
+w₀ = T * (I - R * W) * u₀
 q₀ = [v₀; w₀]
+
+E(u₀)
+E(R * v₀) + E(T' * w₀)
 
 plot(; title = "Initial conditions", xlabel = "x")
 plot!(y, u₀; label = "u")
@@ -195,7 +147,7 @@ plot!(x, v₀; label = "Wu")
 plot!(x, w₀; label = "Tu")
 # plot!(x, v₀ + w₀; label = "v + w")
 
-savefig(loc * "initial_conditions_energy.pdf")
+# savefig(loc * "initial_conditions_energy.pdf")
 
 plot(; xlabel = "x")
 plot!(y, u₀ .^ 2 ./ 2; label = "e(u)")
@@ -222,10 +174,10 @@ v_valid = apply_filter(W, u_valid)
 v_test = apply_filter(W, u_test)
 
 # Latent solutions
-w = reshape(T(Array(u), τ), M, :)
-w_train = reshape(T(reshape(Array(u_train), N, :), τ), M, n_train, :)
-w_valid = reshape(T(reshape(Array(u_valid), N, :), τ), M, n_valid, :)
-w_test = reshape(T(reshape(Array(u_test), N, :), τ), M, n_test, :)
+w = apply_filter(T * (I - R * W), u)
+w_train = apply_filter(T * (I - R * W), u_train)
+w_valid = apply_filter(T * (I - R * W), u_valid)
+w_test = apply_filter(T * (I - R * W), u_test)
 
 # Augmented states
 q = [v; w]
@@ -246,10 +198,10 @@ dvdt_valid = apply_filter(W, dudt_valid)
 dvdt_test = apply_filter(W, dudt_test)
 
 # Filtered latent time derivatives
-dwdt = reshape(T(Array(dudt), τ), M, :)
-dwdt_train = reshape(T(reshape(Array(dudt_train), N, :), τ), M, n_train, :)
-dwdt_valid = reshape(T(reshape(Array(dudt_valid), N, :), τ), M, n_valid, :)
-dwdt_test = reshape(T(reshape(Array(dudt_test), N, :), τ), M, n_test, :)
+dwdt = apply_filter(T * (I - R * W), dudt)
+dwdt_train = apply_filter(T * (I - R * W), dudt_train)
+dwdt_valid = apply_filter(T * (I - R * W), dudt_valid)
+dwdt_test = apply_filter(T * (I - R * W), dudt_test)
 
 # Augmented time derivatives
 dqdt = [dvdt; dwdt]
@@ -257,69 +209,19 @@ dqdt_train = [dvdt_train; dwdt_train]
 dqdt_valid = [dvdt_valid; dwdt_valid]
 dqdt_test = [dvdt_test; dwdt_test]
 
-decomp = svd(Matrix(W))
-
-UU, SS, VV = decomp
-
-plotmat(R)
-plotmat(VV * Diagonal(1 ./ SS) * UU')
-
-plotmat(R * W)
-
-vals, vecs = eigen(I - VV * VV')
-scatter(vals)
-
-
-plot(; xlabel = "x")
-plot!(y, u₀)
-plot!(y, R * W * u₀)
-plot!(y, (I - VV * VV') * u₀)
-# plot!(y, vecs * vecs' * u₀)
-plot!(y, vecs[:, M+1:end] * vecs[:, M+1:end]' * u₀)
-
-plot(y, vecs[:, M+1:end] * vecs[:, M+1:end]' * u₀)
-plot(y, vecs * vecs' * u₀)
-plot(y, vecs[:, 54])
-
-plotmat(I - VV * VV')
-
-UU
-SS
-VV
-
-plotmat(UU)
-plot(y, VV[:, 1:6])
-
-dec = svd(VV')
-
-plotmat(dec.U)
-scatter(dec.S)
-plot(y, dec.V[:, 34])
-
-plotmat(W' * UU * Diagonal(1 ./ SS .^ 2) * UU')
-
-scatter(decomp.S)
-scatter(vals)
-scatter!(1 .- decomp.S .^ 2 .* 10)
-
-r = 50
-TT = vecs[:, 1:r] * Diagonal(vals[1:r]) * vecs[:, 1:r]'
-plotmat(TT)
-
 plot(; xlabel = "x")
 plot!(y, u₀; label = "u")
-plot!(y, s * W' * v₀; label = "Rv")
-# plot!(y, TT * u₀; label = "T'Tu")
-plot!(y, s * W' * v₀ + TT * u₀; label = "Rv + T'Tu")
-
-Ew = sum(u .* (TT * u); dims = 1)[:] / 2N
-r
+plot!(y, R * v₀; label = "Rv")
+# plot!(y, T'T * (I - R * W) * u₀; label = "T'T(I-RW)u")
+plot!(y, R * v₀ + T'T * (I - R * W) * u₀; label = "Rv + T'w")
 
 plot(; title = "Kinetic energy", xlabel = "t", legend = :right)
 plot!(t, E.(eachcol(u)); label = "E(u)")
-plot!(t, E.(eachcol(v)); label = "E(Wu)")
-# plot!(t, E.(eachcol(v)) + Ew; label = "E(Wu) + E(Tu)")
-plot!(t, E.(eachcol(v)) .+ E.(eachcol(w)); label = "E(Wu) + E(Tu)")
+# plot!(t, E.(eachcol(v)); label = "E(Wu)")
+plot!(t, E.(eachcol(R * W * u)); label = "E(ubar)")
+plot!(t, E.(eachcol(R * W * u)) + E.(eachcol((I - R * W) * u)); label = "E(ubar) + E(u')")
+plot!(t, E.(eachcol(R * v)) + E.(eachcol(T' * T * (I - R * W) * u)); label = "E(ubar) + E(utilde)")
+# plot!(t, E.(eachcol(v)) .+ E.(eachcol(w)); label = "E(Wu) + E(Tu)")
 # ylims!((0, ylims()[2]))
 
 savefig(loc * "energy_compression.pdf")

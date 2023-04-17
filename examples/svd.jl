@@ -26,6 +26,7 @@ y = LinRange(0, l(), N + 1)[2:end]
 
 # Filter widths
 ΔΔ(x) = 5 / 100 * l() * (1 + 1 / 3 * sin(2π * x / l()))
+# ΔΔ(x) = 4/3 * 5 / 100 * l() * (1 + 1 / 2 * sin(2π * x / l()))
 Δ = ΔΔ.(x)
 plot(x, Δ; legend = false, xlabel = "x", title = "Filter width Δ(x)")
 
@@ -48,10 +49,9 @@ dropzeros!(W)
 # Linear interpolant
 R = W' / Matrix(W * W')
 
-Φ, σ, VV = svd(Matrix(W); full = true)
+Φ, σ, ΨΞ = svd(Matrix(W); full = true)
 Σ = Diagonal(σ)
-Ψ = VV[:, 1:M]
-Ξ = VV[:, M+1:end]
+Ψ, Ξ = (ΨΞ[:, i] for i ∈ (1:M, M+1:N))
 V = Ξ'
 P = Ξ
 
@@ -77,7 +77,18 @@ A = W * F * R
 B = W * F * P
 C = V * F * R
 D = V * F * P
+plotmat(A)
 
-dec = svd(Matrix(I / N - W'W / M))
+WW = √s * Ψ * Σ * Ψ'
+WW = Ψ * Ψ'
 
-scatter(dec.S)
+RR = √s * Ψ * Φ'
+plotmat(RR)
+
+plotmat(WW)
+plot(sum.(eachrow(WW)))
+
+dec = svd(I - WW)
+U, S, VV = dec
+scatter(S)
+plot(VV[:, 1])

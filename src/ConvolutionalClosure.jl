@@ -1,5 +1,6 @@
 module ConvolutionalClosure
 
+using FFTW
 using LinearAlgebra
 using Lux
 using Optimisers
@@ -7,19 +8,20 @@ using OrdinaryDiffEq
 using Plots
 using Random
 using SparseArrays
+using SpecialFunctions
 using Zygote
 
 export top_hat, gaussian, apply_filter
 export Convection,
     Diffusion, Burgers, KortewegDeVries, KuramotoSivashinsky, Schrodinger, eqname
-export rk4
 export relerr, trajectory_loss, derivative_loss
 export plotsol, plotfield, plotmat
 export create_pod
 export create_data
-export solve_equation
-export glorot_uniform_Float64
-export convolutional_closure, convolutional_matrix_closure
+export solve_equation, solve_matrix, rk4
+export glorot_uniform_Float64, relu, gelu
+export FourierLayer
+export convolutional_closure, convolutional_matrix_closure, fourier_closure
 export train
 export circulant, constant_interpolator, linear_interpolator
 export extend1D, extend2D
@@ -32,8 +34,8 @@ include("loss.jl")
 include("plots.jl")
 include("pod.jl")
 include("create_data.jl")
-include("solve_equation.jl")
 include("init.jl")
+include("fourier_layer.jl")
 include("closure_models.jl")
 include("train.jl")
 include("utils.jl")
