@@ -27,7 +27,7 @@ plotmat(W * R)
 
 plotmat(R'R / N)
 
-plotmat(Φ*Ψ')
+plotmat(Φ * Ψ')
 
 # k = 9
 # for k = M:-1:1
@@ -86,8 +86,10 @@ plot(; title = "i = $i", xlabel = "x")
 plot!(y, √N * Ψ[:, i]; label = "√N ψ")
 plot!(x, √M * Φ[:, i]; label = "√M ϕ")
 
-i = 2; plot(y, Ψ[:, i]; title = "Right singular vectors $i", xlabel = "x")
-i = 316; plot(y, P[:, i]; title = "Right singular vectors $i", xlabel = "x")
+i = 2;
+plot(y, Ψ[:, i]; title = "Right singular vectors $i", xlabel = "x");
+i = 316;
+plot(y, P[:, i]; title = "Right singular vectors $i", xlabel = "x");
 
 for i = 1:M
     display(plot(y, Ψ[:, i]; title = "Right singular vectors $i", xlabel = "x"))
@@ -268,8 +270,8 @@ plot!(y, u - X * u; label = "u - Xu")
 plot(; xlabel = "x", title = "Kinetic energy")
 plot!(y, u .^ 2; label = "u")
 # plot!(x, (W * u).^2; label = "Wu")
-plot!(y, (R * W * u).^2; label = "RWu")
-plot!(y, (R * W * u).^2 .+ (P * V * u) .^ 2; label = "RWu + PVu")
+plot!(y, (R * W * u) .^ 2; label = "RWu")
+plot!(y, (R * W * u) .^ 2 .+ (P * V * u) .^ 2; label = "RWu + PVu")
 # plot!(y, (P * V * u) .^ 2; label = "PVu")
 # plot!(y[M+1:end], V * u; label = "Vu")
 

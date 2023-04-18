@@ -220,7 +220,11 @@ plot!(t, E.(eachcol(u)); label = "E(u)")
 # plot!(t, E.(eachcol(v)); label = "E(Wu)")
 plot!(t, E.(eachcol(R * W * u)); label = "E(ubar)")
 plot!(t, E.(eachcol(R * W * u)) + E.(eachcol((I - R * W) * u)); label = "E(ubar) + E(u')")
-plot!(t, E.(eachcol(R * v)) + E.(eachcol(T' * T * (I - R * W) * u)); label = "E(ubar) + E(utilde)")
+plot!(
+    t,
+    E.(eachcol(R * v)) + E.(eachcol(T' * T * (I - R * W) * u));
+    label = "E(ubar) + E(utilde)",
+)
 # plot!(t, E.(eachcol(v)) .+ E.(eachcol(w)); label = "E(Wu) + E(Tu)")
 # ylims!((0, ylims()[2]))
 
