@@ -15,8 +15,7 @@ end
 
 Lux.initialparameters(rng::AbstractRNG, (; kmax, n, init_weight)::FourierLayer) = (;
     spatial_weight = init_weight(rng, n, n),
-    spectral_weights_real = init_weight(rng, n, n, kmax),
-    spectral_weights_imag = init_weight(rng, n, n, kmax),
+    spectral_weights = init_weight(rng, 2, n, n, kmax),
 )
 Lux.initialstates(::AbstractRNG, ::FourierLayer) = (;)
 Lux.parameterlength((; kmax, n)::FourierLayer) = n * n + 2 * n * n * kmax
@@ -29,7 +28,8 @@ function ((; n, kmax, σ)::FourierLayer)(x, params, state)
 
     # Destructure params
     W = params.spatial_weight
-    R = params.spectral_weights_real .+ im .* params.spectral_weights_imag
+    R = params.spectral_weights
+    R = R[1, :, :, :] .+ im .* R[2, :, :, :]
 
     # Spatial part (applied point-wise)
     y = reshape(x, n, :)
