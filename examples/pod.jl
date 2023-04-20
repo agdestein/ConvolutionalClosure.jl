@@ -101,14 +101,14 @@ rom = create_pod(equation(), u_train_pod, M)
 Φ
 
 # ROM solutions
-v_train = apply_filter(Φ', u_train)
-v_valid = apply_filter(Φ', u_valid)
-v_test = apply_filter(Φ', u_test)
+v_train = apply_matrix(Φ', u_train)
+v_valid = apply_matrix(Φ', u_valid)
+v_test = apply_matrix(Φ', u_test)
 
 # ROM solutions
-dvdt_train = apply_filter(Φ', equation()(u_train, nothing, 0.0))
-dvdt_valid = apply_filter(Φ', equation()(u_valid, nothing, 0.0))
-dvdt_test = apply_filter(Φ', equation()(u_test, nothing, 0.0))
+dvdt_train = apply_matrix(Φ', equation()(u_train, nothing, 0.0))
+dvdt_valid = apply_matrix(Φ', equation()(u_valid, nothing, 0.0))
+dvdt_test = apply_matrix(Φ', equation()(u_test, nothing, 0.0))
 
 ## Example solution
 u₀ = @. sin(2π * ξ / l()) + sin(2π * 3ξ / l()) + cos(2π * 5ξ / l())

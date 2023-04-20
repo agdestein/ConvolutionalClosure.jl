@@ -224,10 +224,10 @@ u_valid = solve_matrix(FN, u₀_valid, t_valid; reltol = 1e-4, abstol = 1e-6)
 u_test = solve_matrix(FN, u₀_test, t_test; reltol = 1e-4, abstol = 1e-6)
 
 # Filtered solutions
-ū = apply_filter(W, u)
-ū_train = apply_filter(W, u_train)
-ū_valid = apply_filter(W, u_valid)
-ū_test = apply_filter(W, u_test)
+ū = apply_matrix(W, u)
+ū_train = apply_matrix(W, u_train)
+ū_valid = apply_matrix(W, u_valid)
+ū_test = apply_matrix(W, u_test)
 
 # Latent solutions
 w = reshape(T(Array(u), τ), M, :)
@@ -242,16 +242,16 @@ q_valid = [ū_valid; w_valid]
 q_test = [ū_test; w_test]
 
 # Time derivatives
-dudt = apply_filter(FN, u)
-dudt_train = apply_filter(FN, u_train)
-dudt_valid = apply_filter(FN, u_valid)
-dudt_test = apply_filter(FN, u_test)
+dudt = apply_matrix(FN, u)
+dudt_train = apply_matrix(FN, u_train)
+dudt_valid = apply_matrix(FN, u_valid)
+dudt_test = apply_matrix(FN, u_test)
 
 # Filtered time derivatives
-dūdt = apply_filter(W, dudt)
-dūdt_train = apply_filter(W, dudt_train)
-dūdt_valid = apply_filter(W, dudt_valid)
-dūdt_test = apply_filter(W, dudt_test)
+dūdt = apply_matrix(W, dudt)
+dūdt_train = apply_matrix(W, dudt_train)
+dūdt_valid = apply_matrix(W, dudt_valid)
+dūdt_test = apply_matrix(W, dudt_test)
 
 # Filtered latent time derivatives
 dwdt = reshape(T(Array(dudt), τ), M, :)

@@ -128,14 +128,14 @@ u_valid =
 u_test = solve_equation(equation(), u₀_test, nothing, t_test; reltol = 1e-4, abstol = 1e-6)
 
 # Filtered solutions
-v_train = apply_filter(W, u_train)
-v_valid = apply_filter(W, u_valid)
-v_test = apply_filter(W, u_test)
+v_train = apply_matrix(W, u_train)
+v_valid = apply_matrix(W, u_valid)
+v_test = apply_matrix(W, u_test)
 
 # Filtered time derivatives (for derivative fitting)
-dvdt_train = apply_filter(W, equation()(u_train, nothing, 0.0))
-dvdt_valid = apply_filter(W, equation()(u_valid, nothing, 0.0))
-dvdt_test = apply_filter(W, equation()(u_test, nothing, 0.0))
+dvdt_train = apply_matrix(W, equation()(u_train, nothing, 0.0))
+dvdt_valid = apply_matrix(W, equation()(u_valid, nothing, 0.0))
+dvdt_test = apply_matrix(W, equation()(u_test, nothing, 0.0))
 
 ## Plot some reference solutions
 u, v, t = u_train, v_train, t_train

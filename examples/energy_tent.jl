@@ -168,16 +168,16 @@ u_valid = solve_matrix(FN, u₀_valid, t_valid; reltol = 1e-4, abstol = 1e-6)
 u_test = solve_matrix(FN, u₀_test, t_test; reltol = 1e-4, abstol = 1e-6)
 
 # Filtered solutions
-v = apply_filter(W, u)
-v_train = apply_filter(W, u_train)
-v_valid = apply_filter(W, u_valid)
-v_test = apply_filter(W, u_test)
+v = apply_matrix(W, u)
+v_train = apply_matrix(W, u_train)
+v_valid = apply_matrix(W, u_valid)
+v_test = apply_matrix(W, u_test)
 
 # Latent solutions
-w = apply_filter(T * (I - R * W), u)
-w_train = apply_filter(T * (I - R * W), u_train)
-w_valid = apply_filter(T * (I - R * W), u_valid)
-w_test = apply_filter(T * (I - R * W), u_test)
+w = apply_matrix(T * (I - R * W), u)
+w_train = apply_matrix(T * (I - R * W), u_train)
+w_valid = apply_matrix(T * (I - R * W), u_valid)
+w_test = apply_matrix(T * (I - R * W), u_test)
 
 # Augmented states
 q = [v; w]
@@ -186,22 +186,22 @@ q_valid = [v_valid; w_valid]
 q_test = [v_test; w_test]
 
 # Time derivatives
-dudt = apply_filter(FN, u)
-dudt_train = apply_filter(FN, u_train)
-dudt_valid = apply_filter(FN, u_valid)
-dudt_test = apply_filter(FN, u_test)
+dudt = apply_matrix(FN, u)
+dudt_train = apply_matrix(FN, u_train)
+dudt_valid = apply_matrix(FN, u_valid)
+dudt_test = apply_matrix(FN, u_test)
 
 # Filtered time derivatives
-dvdt = apply_filter(W, dudt)
-dvdt_train = apply_filter(W, dudt_train)
-dvdt_valid = apply_filter(W, dudt_valid)
-dvdt_test = apply_filter(W, dudt_test)
+dvdt = apply_matrix(W, dudt)
+dvdt_train = apply_matrix(W, dudt_train)
+dvdt_valid = apply_matrix(W, dudt_valid)
+dvdt_test = apply_matrix(W, dudt_test)
 
 # Filtered latent time derivatives
-dwdt = apply_filter(T * (I - R * W), dudt)
-dwdt_train = apply_filter(T * (I - R * W), dudt_train)
-dwdt_valid = apply_filter(T * (I - R * W), dudt_valid)
-dwdt_test = apply_filter(T * (I - R * W), dudt_test)
+dwdt = apply_matrix(T * (I - R * W), dudt)
+dwdt_train = apply_matrix(T * (I - R * W), dudt_train)
+dwdt_valid = apply_matrix(T * (I - R * W), dudt_valid)
+dwdt_test = apply_matrix(T * (I - R * W), dudt_test)
 
 # Augmented time derivatives
 dqdt = [dvdt; dwdt]

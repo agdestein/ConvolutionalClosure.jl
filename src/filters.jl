@@ -21,14 +21,14 @@ gaussian(Δx, Δy, x, y) = 6 / (π * Δx * Δy) * exp(-6x^2 / Δx^2 - 6y^2 / Δy
 
 
 """
-    apply_filter(W, u)
+    apply_matrix(A, x)
 
-Apply filter to a collection of solutions.
+Apply matrix `A` to a collection of vectors `x` with any additional tensor dimensions.
 """
-function apply_filter(W, u)
-    u = Array(u)
-    s = size(u)
-    u = reshape(u, s[1], :)
-    y = W * u
-    reshape(y, size(y, 1), s[2:end]...)
+function apply_matrix(A, x)
+    x = Array(x)
+    n, s... = size(x)
+    x = reshape(x, n, :)
+    y = A * x
+    reshape(y, size(y, 1), s...)
 end

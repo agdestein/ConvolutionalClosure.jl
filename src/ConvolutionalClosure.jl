@@ -11,7 +11,7 @@ using SparseArrays
 using SpecialFunctions
 using Zygote
 
-export top_hat, gaussian, apply_filter
+export top_hat, gaussian, apply_matrix
 export Convection,
     Diffusion, Burgers, KortewegDeVries, KuramotoSivashinsky, Schrodinger, eqname
 export relerr, trajectory_loss, derivative_loss

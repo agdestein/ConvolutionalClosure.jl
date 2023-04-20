@@ -344,9 +344,9 @@ u_valid = solve_matrix(FN, u₀_valid, t_valid; reltol = 1e-4, abstol = 1e-6)
 u_test = solve_matrix(FN, u₀_test, t_test; reltol = 1e-4, abstol = 1e-6)
 
 # Filtered solutions
-ū_train = apply_filter(W, u_train)
-ū_valid = apply_filter(W, u_valid)
-ū_test = apply_filter(W, u_test)
+ū_train = apply_matrix(W, u_train)
+ū_valid = apply_matrix(W, u_valid)
+ū_test = apply_matrix(W, u_test)
 
 plotsol(y, t_train, u_train[:, 1, :]; title = "u")
 plotsol(y, t_valid, u_valid[:, 1, :]; title = "u")
@@ -357,19 +357,19 @@ plotsol(x, t_valid, ū_valid[:, 1, :]; title = "ū")
 plotsol(x, t_test, ū_test[:, 1, :]; title = "ū")
 
 # Sub-filter solutions
-e_train = apply_filter(I - R * W, u_train)
-e_valid = apply_filter(I - R * W, u_valid)
-e_test = apply_filter(I - R * W, u_test)
+e_train = apply_matrix(I - R * W, u_train)
+e_valid = apply_matrix(I - R * W, u_valid)
+e_test = apply_matrix(I - R * W, u_test)
 
 # Filtered time derivatives (for derivative fitting)
-dūdt_train = apply_filter(W, apply_filter(FN, u_train))
-dūdt_valid = apply_filter(W, apply_filter(FN, u_valid))
-dūdt_test = apply_filter(W, apply_filter(FN, u_test))
+dūdt_train = apply_matrix(W, apply_matrix(FN, u_train))
+dūdt_valid = apply_matrix(W, apply_matrix(FN, u_valid))
+dūdt_test = apply_matrix(W, apply_matrix(FN, u_test))
 
 # Markovian terms
-markov_train = apply_filter(A, ū_train)
-markov_valid = apply_filter(A, ū_valid)
-markov_test = apply_filter(A, ū_test)
+markov_train = apply_matrix(A, ū_train)
+markov_valid = apply_matrix(A, ū_valid)
+markov_test = apply_matrix(A, ū_test)
 
 # Noise terms
 o_train = reshape(
@@ -425,9 +425,9 @@ plotsol(x, t_valid, w_valid[:, 1, :]; title = "w")
 plotsol(x, t_test, w_test[:, 1, :]; title = "w")
 
 # Latent time derivatives
-dwdt_train = apply_filter(W * FN^2 - A * W * FN, u_train) - dodt_train
-dwdt_valid = apply_filter(W * FN^2 - A * W * FN, u_valid) - dodt_valid
-dwdt_test = apply_filter(W * FN^2 - A * W * FN, u_test) - dodt_test
+dwdt_train = apply_matrix(W * FN^2 - A * W * FN, u_train) - dodt_train
+dwdt_valid = apply_matrix(W * FN^2 - A * W * FN, u_valid) - dodt_valid
+dwdt_test = apply_matrix(W * FN^2 - A * W * FN, u_test) - dodt_test
 
 # States s = (ū, w)
 s_train = reshape(vcat(ū_train, w_train), M, 2, n_train, :)
