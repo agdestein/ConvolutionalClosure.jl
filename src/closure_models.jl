@@ -215,3 +215,74 @@ function fourier_closure(
 
     p, closure
 end
+
+"""
+    matrix_transform_closure(T, n; channel_augmenter = identity, σ = gelu, [rng])
+
+Matrix transform operator closure with transform `T`, `n` latent channels, and actiavation function `σ`.
+
+In addition to an intial and final point-wise lift and compression,
+this model is comprised of four inner matrix transform layers.
+
+For each matrix transform layer, the output is `σ(y + z)`, where
+
+  - `y` is a spatial point-wise linear transform of the input
+  - `z` is a spectral mode-wise linear transform of the truncated spectrum of
+    the input
+
+Note: Spatial inputs must be uniformly discretized on `size(T, 1)` points.
+"""
+function matrix_transform_closure(
+    T,
+    n;
+    channel_augmenter = identity,
+    σ = gelu,
+    rng = Random.default_rng(),
+)
+    # Number of input channels
+    nchannel = length(channel_augmenter(1))
+
+    # Discrete closure term for filtered equation
+    NN = Chain(
+        # From (nx, nsample) to (nchannel, nx, nsample)
+        u -> reshape(u, 1, size(u, 1), size(u, 2)),
+
+        # Augment channels
+        channel_augmenter,
+
+        # Lift input channels to latent space
+        Dense(nchannel => n; bias = false),
+
+        # Fourier layers
+        MatrixTransformLayer(; T, n, σ),
+        MatrixTransformLayer(; T, n, σ),
+        MatrixTransformLayer(; T, n, σ),
+        MatrixTransformLayer(; T, n),
+
+        # Compress to single output channel
+        Dense(n => 2n, σ),
+        Dense(2n => 1; bias = false),
+
+        # From (nchannel = 1, nx, nsample) to (nx, nsample)
+        u -> reshape(u, size(u, 2), size(u, 3)),
+    )
+
+    # Create initial parameters and (empty) state
+    params, state = Lux.setup(rng, NN)
+    p, re = destructure(params)
+
+    """
+        closure(u, p, t) 
+
+    Compute closure term at state `u` and time `t` for given parameters `p`.
+    """
+    function closure end
+
+    # Note: This method stores `NN`, `re` and `state`
+    closure(u, p, t) = first(NN(u, re(p), state))
+
+    # Make sure that single-sample vectors preserve shape
+    closure(u::AbstractVector, p, t) = reshape(closure(reshape(u, :, 1), p, t), :)
+
+    p, closure
+end

@@ -20,8 +20,9 @@ export create_pod
 export create_data
 export solve_equation, solve_matrix, rk4
 export glorot_uniform_Float64, relu, gelu
-export FourierLayer
-export convolutional_closure, convolutional_matrix_closure, fourier_closure
+export FourierLayer, MatrixTransformLayer
+export convolutional_closure,
+    convolutional_matrix_closure, fourier_closure, matrix_transform_closure
 export train
 export circulant, constant_interpolator, linear_interpolator
 export extend1D, extend2D

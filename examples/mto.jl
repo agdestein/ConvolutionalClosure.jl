@@ -48,14 +48,9 @@ y = LinRange(0, l(), N + 1)[2:end]
 Δx = l() / M
 Δy = l() / N
 
-# # Filter widths
-# ΔΔ(x) = 5 / 100 * l() * (1 + 1 / 3 * sin(2π * x / l()))
-# Δ = ΔΔ.(x)
-# plot(x, Δ; xlabel = "x", legend = false, title = "Filter width Δ(x)")
-# ylims!((0, ylims()[2]))
-
-# Filter width
-Δ = 3Δx
+# Filter widths
+ΔΔ(x) = 5 / 100 * l() * (1 + 1 / 3 * sin(2π * x / l()))
+Δ = ΔΔ.(x)
 
 # Discrete filter matrix
 W = sum(-1:1) do z
@@ -68,31 +63,12 @@ W = sparse(W)
 dropzeros!(W)
 plotmat(W; title = "W")
 
-## Example solution
-u₀ = @. 1 + 0 * y
-u₀ = @. sin(2π * y / l()) + sin(2π * 3y / l()) + cos(2π * 5y / l())
-u₀ = @. sin(2π * y / l())
-u₀ = @. exp(-(y / l() - 0.5)^2 / 0.005)
-u₀ = @. 1.0 * (abs(y / l() - 0.5) ≤ 1 / 6)
-plot(u₀; xlabel = "x")
+Φ, σ, Ψ = svd(Matrix(W))
+Σ = Diagonal(σ)
 
-# u₀ = complex(u₀)
-
-# Plot example solution
-t = LinRange(0, 10 * tref(), 101)
-u = solve_equation(equation(), u₀, nothing, t; reltol = 1e-6, abstol = 1e-8)
-v = W * u
-for (i, t) ∈ enumerate(t)
-    pl = plot(;
-        xlabel = "x",
-        title = @sprintf("t = %.2f", t),
-        ylims = extrema(real.(u[:, :])),
-    )
-    plot!(pl, y, real.(u[:, i]); label = "Unfiltered")
-    plot!(pl, x, real.(v[:, i]); label = "Filtered")
-    display(pl)
-    sleep(0.005) # Time for plot pane to update
-end
+i = 7
+plot(x, Φ[:, i])
+plot!(y, √s * Ψ[:, i])
 
 """
 Linear-ish frequency decay.
@@ -136,23 +112,6 @@ dvdt_train = apply_matrix(W, equation()(u_train, nothing, 0.0))
 dvdt_valid = apply_matrix(W, equation()(u_valid, nothing, 0.0))
 dvdt_test = apply_matrix(W, equation()(u_test, nothing, 0.0))
 
-## Plot some reference solutions
-u, v, t = u_train, v_train, t_train
-# u, v, t = u_valid, v_valid, t_valid
-# u, v, t = u_test, v_test, t_test
-iplot = 1:3
-for (i, t) ∈ enumerate(t)
-    pl = plot(;
-        xlabel = "x",
-        title = @sprintf("Reference data, t = %.5f", t),
-        ylims = extrema(u[:, iplot, :]),
-    )
-    plot!(pl, y, u[:, iplot, i]; color = 1, label = "Unfiltered")
-    plot!(pl, x, v[:, iplot, i]; color = 2, label = "Filtered exact")
-    display(pl)
-    sleep(0.05)
-end
-
 # Callback for studying convergence
 function create_callback(f, v, t)
     iplot = 1:10
@@ -186,31 +145,6 @@ end
 
 # Reference model
 c_ref(u) = W * equation()(u, nothing, 0.0) - equation()(W * u, nothing, 0.0)
-
-# Simple model
-p₀_simple, c_simple = convolutional_closure(
-    # Kernel radii (nlayer)
-    [5],
-
-    # Number of channels (nlayer)
-    # Last must be 1
-    [1],
-
-    # Activation functions (nlayer)
-    [identity],
-
-    # Bias
-    [false];
-
-    # Input channels
-    channel_augmenter = u -> hcat(
-        # Vanilla channel
-        u,
-
-        # Square channel to mimic non-linear term
-        u .* u,
-    ),
-)
 
 # Initialize NN
 p₀_cnn, c_cnn = convolutional_closure(
@@ -261,6 +195,24 @@ p₀_fno, c_fno = fourier_closure(
     ),
 )
 
+# MTO
+p₀_mto, c_mto = matrix_transform_closure(
+    # Matrix transform 
+    Φ[:, 1:10],
+
+    # Latent dimension
+    5;
+
+    # Input channels
+    channel_augmenter = u -> vcat(
+        # Vanilla channel
+        u,
+
+        # Square channel to mimic non-linear term
+        u .* u,
+    ),
+)
+
 """
 Compute right hand side of closed filtered equation.
 This is modeled as unfiltered RHS + neural closure term.
@@ -268,6 +220,7 @@ This is modeled as unfiltered RHS + neural closure term.
 filtered_simple(u, p, t) = equation()(u, nothing, t) + c_simple(u, p, t)
 filtered_cnn(u, p, t) = equation()(u, nothing, t) + c_cnn(u, p, t)
 filtered_fno(u, p, t) = equation()(u, nothing, t) + c_fno(u, p, t)
+filtered_mto(u, p, t) = equation()(u, nothing, t) + c_mto(u, p, t)
 
 p_simple_df = train(
     # Loss function
@@ -355,6 +308,35 @@ p_fno_df = train(
     callback = create_callback(filtered_fno, v_valid, t_valid),
 )
 
+p_mto_df = train(
+    # Loss function
+    p -> derivative_loss(
+        filtered_mto,
+        p,
+
+        # Merge solution and time dimension, with new size `(nx, nsolution*ntime)`
+        reshape(dvdt_train, M, :),
+        reshape(v_train, M, :);
+
+        # Number of random data samples for each loss evaluation (batch size)
+        nuse = 100,
+
+        # Tikhonov regularization weight
+        λ = 1e-8,
+    ),
+
+    # Initial parameters
+    p₀_mto,
+    # p_mto_df,
+
+    # Iterations
+    1_000;
+
+    # Iterations per callback
+    ncallback = 10,
+    callback = create_callback(filtered_mto, v_valid, t_valid),
+)
+
 uu = u₀_test[:, 1]
 vv = W * uu
 
@@ -363,6 +345,7 @@ plot(; xlabel = "x", title = "Closure term")
 plot!(x, c_ref(uu); label = "Ref")
 plot!(x, c_cnn(vv, p_cnn_df, 0.0); label = "CNN")
 plot!(x, c_fno(vv, p_fno_df, 0.0); label = "FNO")
+plot!(x, c_mto(vv, p_mto_df, 0.0); label = "MTO")
 
 # filename = "output/$(eqname(equation()))_df.jld2"
 # jldsave(filename; p_df)
