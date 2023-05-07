@@ -148,14 +148,14 @@ c_ref(u) = W * equation()(u, nothing, 0.0) - equation()(W * u, nothing, 0.0)
 
 # Initialize NN
 p₀_cnn, c_cnn = convolutional_closure(
-    # Kernel radii (nlayer)
+    # Kernel radii
     [5, 5, 3],
 
-    # Number of channels (nlayer + 1)
+    # Number of channels
     # Last must be 1
     [4, 3, 1],
 
-    # Activation functions (nlayer)
+    # Activation functions
     [Lux.relu, Lux.relu, identity],
 
     # Bias

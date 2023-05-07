@@ -37,7 +37,7 @@ function ((; n, kmax, σ)::FourierLayer)(x, params, state)
     y = reshape(y, n, nx, :)
 
     # Spectral part (applied mode-wise)
-    # Todo: Check normalization of `fft` for different discretizations
+    # TODO: Check normalization of `fft` for different discretizations
     z = fft(x, 2)
     z = z[:, 1:kmax + 1, :]
     # z1 = z[:, 1:kmax, :]
