@@ -36,10 +36,10 @@ equation() = Burgers(l(), μ())
 # equation() = Schrodinger()
 
 # Coarse discretization
-M = 32
+M = 50
 
 # Fine discretization
-s = 8
+s = 10
 N = s * M
 
 # Grid
@@ -76,8 +76,8 @@ Linear-ish frequency decay.
 decay(k) = 1 / (1 + abs(k))^1.2
 
 ## Maximum frequency in initial conditions
-# K = N ÷ 2
-K = 30
+K = N ÷ 2
+# K = 30
 
 # Number of samples
 n_train = 120
@@ -198,7 +198,7 @@ p₀_fno, c_fno = fourier_closure(
 # MTO
 p₀_mto, c_mto = matrix_transform_closure(
     # Matrix transform 
-    Φ[:, 1:10],
+    Φ[:, 1:16],
 
     # Latent dimension
     5;
@@ -217,43 +217,13 @@ p₀_mto, c_mto = matrix_transform_closure(
 Compute right hand side of closed filtered equation.
 This is modeled as unfiltered RHS + neural closure term.
 """
-filtered_simple(u, p, t) = equation()(u, nothing, t) + c_simple(u, p, t)
 filtered_cnn(u, p, t) = equation()(u, nothing, t) + c_cnn(u, p, t)
 filtered_fno(u, p, t) = equation()(u, nothing, t) + c_fno(u, p, t)
 filtered_mto(u, p, t) = equation()(u, nothing, t) + c_mto(u, p, t)
 
-p_simple_df = train(
-    # Loss function
-    p -> derivative_loss(
-        filtered_simple,
-        p,
-
-        # Merge solution and time dimension, with new size `(nx, nsolution*ntime)`
-        reshape(dvdt_train, M, :),
-        reshape(v_train, M, :);
-
-        # Number of random data samples for each loss evaluation (batch size)
-        nuse = 100,
-
-        # Tikhonov regularization weight
-        λ = 1e-8,
-    ),
-
-    # Initial parameters
-    p₀_simple,
-    # p_simple_df,
-
-    # Iterations
-    10_000;
-
-    # Iterations per callback
-    ncallback = 100,
-    callback = create_callback(filtered_simple, v_valid, t_valid),
-)
-
 p_cnn_df = train(
     # Loss function
-    p -> derivative_loss(
+    p -> prediction_loss(
         filtered_cnn,
         p,
 
@@ -272,7 +242,7 @@ p_cnn_df = train(
     p₀_cnn,
     
     # Iterations
-    10_000;
+    2_000;
 
     # Iterations per callback
     ncallback = 100,
@@ -281,7 +251,7 @@ p_cnn_df = train(
 
 p_fno_df = train(
     # Loss function
-    p -> derivative_loss(
+    p -> prediction_loss(
         filtered_fno,
         p,
 
@@ -301,7 +271,7 @@ p_fno_df = train(
     # p_fno_df,
 
     # Iterations
-    5_000;
+    2_000;
 
     # Iterations per callback
     ncallback = 10,
@@ -310,7 +280,7 @@ p_fno_df = train(
 
 p_mto_df = train(
     # Loss function
-    p -> derivative_loss(
+    p -> prediction_loss(
         filtered_mto,
         p,
 
@@ -330,15 +300,17 @@ p_mto_df = train(
     # p_mto_df,
 
     # Iterations
-    1_000;
+    2_000;
 
     # Iterations per callback
     ncallback = 10,
     callback = create_callback(filtered_mto, v_valid, t_valid),
 )
 
-uu = u₀_test[:, 1]
+uu = create_data(y, 20, 1; decay)
+plot(y, uu; label = "u")
 vv = W * uu
+plot!(x, vv; label = "Wu")
 
 plot(; xlabel = "x", title = "Closure term")
 # plot!(x, equation()(vv, nothing, 0.0); label = "vv")
@@ -350,44 +322,6 @@ plot!(x, c_mto(vv, p_mto_df, 0.0); label = "MTO")
 # filename = "output/$(eqname(equation()))_df.jld2"
 # jldsave(filename; p_df)
 # p_df = load(filename, "p_df")
-
-p_simple_tf = train(
-    # Loss function
-    p -> trajectory_loss(
-        filtered_simple,
-        p,
-        v_train,
-        t_train;
-
-        # Number of initial conditions per evaluation
-        nsolution = 5,
-
-        # Number of random time instances per evaluation
-        ntime = 20,
-
-        # Tikhonov regularization weight
-        λ = 1.0e-8,
-
-        # Tolerances
-        reltol = 1e-4,
-        abstol = 1e-6,
-
-        ## Sensitivity algorithm for computing gradient
-        # sensealg = BacksolveAdjoint(; autojacvec = ZygoteVJP()),
-        sensealg = InterpolatingAdjoint(; autojacvec = ZygoteVJP()),
-        # sensealg = QuadratureAdjoint(; autojacvec = ZygoteVJP()),
-    ),
-
-    # Initial paramters
-    p_simple_df,
-
-    # Iterations
-    100;
-
-    # Iterations per callback
-    ncallback = 10,
-    callback = create_callback(filtered_simple, v_valid, t_valid),
-)
 
 p_cnn_tf = train(
     # Loss function
@@ -465,12 +399,50 @@ p_fno_tf = train(
     callback = create_callback(filtered_fno, v_valid, t_valid),
 )
 
-# p_simple = p_simple_df
+p_mto_tf = train(
+    # Loss function
+    p -> trajectory_loss(
+        filtered_mto,
+        p,
+        v_train,
+        t_train;
+
+        # Number of initial conditions per evaluation
+        nsolution = 5,
+
+        # Number of random time instances per evaluation
+        ntime = 20,
+
+        # Tikhonov regularization weight
+        λ = 1.0e-8,
+
+        # Tolerances
+        reltol = 1e-4,
+        abstol = 1e-6,
+
+        ## Sensitivity algorithm for computing gradient
+        # sensealg = BacksolveAdjoint(; autojacvec = ZygoteVJP()),
+        sensealg = InterpolatingAdjoint(; autojacvec = ZygoteVJP()),
+        # sensealg = QuadratureAdjoint(; autojacvec = ZygoteVJP()),
+    ),
+
+    # Initial parameters
+    p_mto_df,
+
+    # Iterations
+    100;
+
+    # Iterations per callback
+    ncallback = 10,
+    callback = create_callback(filtered_mto, v_valid, t_valid),
+)
+
 # p_cnn    = p_cnn_df
 # p_fno    = p_fno_df
+# p_mto    = p_mto_df
 p_simple = p_simple_tf
 p_cnn = p_cnn_tf
-p_fno = p_fno_tf
+p_mto = p_mto_tf
 
 # filename = "output/$(eqname(equation()))_tf.jld2"
 # jldsave(filename; p_tf)

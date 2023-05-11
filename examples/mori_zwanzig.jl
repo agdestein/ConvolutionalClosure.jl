@@ -444,7 +444,7 @@ callback(1, p₀)
 callback(2, p₀)
 
 p_df = train(
-    p -> derivative_loss(
+    p -> prediction_loss(
         system,
         p,
 

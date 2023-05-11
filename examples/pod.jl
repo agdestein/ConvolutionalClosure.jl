@@ -202,7 +202,7 @@ Note that both `u` and `dudt` are of size `(nx, nsample)`.
 function create_loss_derivative_fit(dvdt, v; nuse = size(v, 2), λ = 0)
     function loss(p)
         i = Zygote.@ignore sort(shuffle(1:size(v, 2))[1:nuse])
-        derivative_loss(rom_closed, p, dvdt[:, i], v[:, i], λ)
+        prediction_loss(rom_closed, p, dvdt[:, i], v[:, i], λ)
     end
     loss
 end

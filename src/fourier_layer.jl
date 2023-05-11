@@ -23,7 +23,7 @@ Lux.statelength(::FourierLayer) = 0
 
 # Pass inputs through Fourier layer
 function ((; n, kmax, σ)::FourierLayer)(x, params, state)
-    _, nx, _ = size(x)
+    _, nx, nsample = size(x)
     @assert kmax ≤ nx "Fourier layer input must be discretized on at least `kmax` points"
 
     # Destructure params

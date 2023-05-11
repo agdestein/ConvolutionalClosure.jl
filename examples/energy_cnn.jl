@@ -324,7 +324,7 @@ p₀ = [p₀11; p₀12; p₀22]
 
 Q(q₀, p₀, 0.0)
 
-derivative_loss(
+prediction_loss(
     Q,
     p₀,
     reshape(dqdt_train, 2M, :),
@@ -335,7 +335,7 @@ derivative_loss(
 
 first(
     gradient(
-        p -> derivative_loss(
+        p -> prediction_loss(
             Q,
             p,
             reshape(dqdt_train, 2M, :),
@@ -351,7 +351,7 @@ create_callback(Q, q_valid, t_valid)
 create_callback(Q, q_valid, t_valid)(0, p₀)
 
 p = train(
-    p -> derivative_loss(
+    p -> prediction_loss(
         Q,
         p,
 

@@ -14,7 +14,7 @@ using Zygote
 export top_hat, gaussian, apply_matrix
 export Convection,
     Diffusion, Burgers, KortewegDeVries, KuramotoSivashinsky, Schrodinger, eqname
-export relerr, trajectory_loss, derivative_loss
+export relerr, trajectory_loss, prediction_loss
 export plotsol, plotfield, plotmat
 export create_pod
 export create_data

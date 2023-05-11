@@ -271,7 +271,7 @@ filtered_fno(u, p, t) = equation()(u, nothing, t) + c_fno(u, p, t)
 
 p_simple_df = train(
     # Loss function
-    p -> derivative_loss(
+    p -> prediction_loss(
         filtered_simple,
         p,
 
@@ -300,7 +300,7 @@ p_simple_df = train(
 
 p_cnn_df = train(
     # Loss function
-    p -> derivative_loss(
+    p -> prediction_loss(
         filtered_cnn,
         p,
 
@@ -328,7 +328,7 @@ p_cnn_df = train(
 
 p_fno_df = train(
     # Loss function
-    p -> derivative_loss(
+    p -> prediction_loss(
         filtered_fno,
         p,
 

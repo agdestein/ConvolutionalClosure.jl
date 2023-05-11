@@ -258,7 +258,7 @@ filtered_simple(u, p, t) = equation()(u, nothing, t) + simple_closure(u, p, t)
 filtered(u, p, t) = equation()(u, nothing, t) + closure(u, p, t)
 
 p_simple_df = train(
-    p -> derivative_loss(
+    p -> prediction_loss(
         filtered_simple,
         p,
 
@@ -280,7 +280,7 @@ p_simple_df = train(
 )
 
 p_df = train(
-    p -> derivative_loss(
+    p -> prediction_loss(
         filtered,
         p,
 

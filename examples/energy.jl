@@ -382,7 +382,7 @@ Q(q₀, p₀, 0.0)
 
 @time gradient(p -> sum(Q(repeat(q₀, 1, 100), p, 0.0)), p₀);
 
-derivative_loss(
+prediction_loss(
     Q,
     p₀,
     reshape(dqdt_train, 2M, :),
@@ -393,7 +393,7 @@ derivative_loss(
 
 first(
     gradient(
-        p -> derivative_loss(
+        p -> prediction_loss(
             Q,
             p,
             reshape(dqdt_train, 2M, :),
@@ -410,7 +410,7 @@ create_callback(Q, q_valid, t_valid)(0, p₀)
 
 p = train(
     # Loss
-    p -> derivative_loss(
+    p -> prediction_loss(
         Q,
         p,
 

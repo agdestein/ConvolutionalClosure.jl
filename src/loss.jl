@@ -52,18 +52,18 @@ function trajectory_loss(
 end
 
 """
-    derivative_loss(f, p, dudt, u; nuse = size(u, 2), λ = 0)
+    prediction_loss(f, p, dudt, u; nuse = size(u, 2), λ = 0)
 
-Compute derivative-fitting loss.
+Compute prediction loss between `f(x)` and `y`.
 Chooses a random subset (`nuse`) of the data samples at each evaluation.
-Note that both `u` and `dudt` are of size `(sample_size..., nsample)`.
+Note that both `x` and `y` are of size `(sample_size..., nsample)`.
 """
-function derivative_loss(f, p, dudt, u; nuse = size(u, 2), λ = 0)
-    nsample = size(u)[end]
-    d = ndims(u)
+function prediction_loss(f, p, y, x; nuse = size(x, 2), λ = 0)
+    nsample = size(x)[end]
+    d = ndims(x)
     i = Zygote.@ignore sort(shuffle(1:nsample)[1:nuse])
-    dudt = selectdim(dudt, d, i)
-    u = selectdim(u, d, i)
+    dudt = selectdim(y, d, i)
+    u = selectdim(x, d, i)
     predict = f(u, p, zero(eltype(u)))
     # data = sum(abs2, predict - dudt) / length(u)
     data = sum(abs2, predict - dudt) / sum(abs2, dudt)

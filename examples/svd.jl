@@ -45,6 +45,7 @@ end
 W = W ./ sum(W; dims = 2)
 W = sparse(W)
 dropzeros!(W)
+plotmat(W)
 
 # Linear interpolant
 R = W' / Matrix(W * W')
